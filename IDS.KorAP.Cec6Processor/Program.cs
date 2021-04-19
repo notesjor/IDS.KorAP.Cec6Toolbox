@@ -52,7 +52,12 @@ namespace IDS.KorAP.Cec6Processor
 
             var importer = new ImporterKorapOnlyTreeTagger();
             importer.Execute(new[] {x.Path}).FirstOrDefault()?.Save(outputPath, true);
-            Console.WriteLine($"{level}> {outputPath}...ok ({DateTime.Now - ts})!");
+
+            var iSize = (new FileInfo(x.Path)).Length;
+            var oSize = (new FileInfo(outputPath)).Length;
+            var span = DateTime.Now - ts;
+
+            Console.WriteLine($"{level}> {outputPath}...ok ({span})! >>> in: {iSize / 1000000}MB / out: {oSize / 1000000}MB ({(iSize / 1000000.0 / span.TotalSeconds)}MB/s)");
           }
           catch (Exception ex)
           {
