@@ -18,7 +18,7 @@ namespace IDS.KorAP.Cec6Processor
       var entries = GetEntries();
 
       var level = 0;
-      var parallel = 80;
+      var parallel = 10;
       long min = 0;
       long max = 25 * 1000 * 1000;
       Entry[] selected;
@@ -40,6 +40,8 @@ namespace IDS.KorAP.Cec6Processor
           if (File.Exists("/home/ruediger/cec6processor.stop"))
             return;
 
+          GC.Collect();
+
           var ts = DateTime.Now;
           var outputPath = Path.Combine("/home/ruediger/CEC6", Path.GetFileNameWithoutExtension(x.Path) + ".cec6.gz");
           try
@@ -50,14 +52,13 @@ namespace IDS.KorAP.Cec6Processor
               return;
             }
 
-            var importer = new ImporterKorapOnlyTreeTagger();
-            importer.Execute(new[] {x.Path}).FirstOrDefault()?.Save(outputPath, true);
+            ProcessCorpus(x, outputPath);
 
             var iSize = (new FileInfo(x.Path)).Length;
             var oSize = (new FileInfo(outputPath)).Length;
             var span = DateTime.Now - ts;
 
-            Console.WriteLine($"{level}> {outputPath}...ok ({span})! >>> in: {iSize / 1000000}MB / out: {oSize / 1000000}MB ({(iSize / 1000000.0 / span.TotalSeconds)}MB/s)");
+            Console.WriteLine($"{level}> {outputPath}...ok ({span})! >>> in: {iSize / 1000}KB / out: {oSize / 1000}KB ({Math.Round(iSize / 1000.0 / span.TotalSeconds, 2)}KB/s)");
           }
           catch (Exception ex)
           {
@@ -73,12 +74,22 @@ namespace IDS.KorAP.Cec6Processor
           }
         });
 
-        parallel /= 2;
+        parallel--;
         if (parallel < 2)
           parallel = 2;
       } while (selected.Length > 0);
 
       Console.WriteLine("!END!");
+    }
+
+    private static void ProcessCorpus(Entry x, string outputPath)
+    {
+      var importer = new ImporterKorapInMemory();
+      var corpus = importer.Execute(new[] {x.Path}).FirstOrDefault();
+      corpus?.Save(outputPath, true);
+      if(corpus is IDisposable c)
+        c.Dispose();
+      importer.Dispose();
     }
 
     private static List<Entry> GetEntries()
