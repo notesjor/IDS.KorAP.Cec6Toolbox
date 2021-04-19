@@ -27,6 +27,9 @@ namespace IDS.KorAP.Cec6Processor
 
       do
       {
+        if (File.Exists("/home/ruediger/cec6processor.stop"))
+          return;
+
         level++;
 
         selected = entries.Where(x => x.Valid(min, max)).ToArray();
@@ -34,6 +37,10 @@ namespace IDS.KorAP.Cec6Processor
 
         Parallel.ForEach(selected, new ParallelOptions {MaxDegreeOfParallelism = parallel}, x =>
         {
+          if (File.Exists("/home/ruediger/cec6processor.stop"))
+            return;
+
+          var ts = DateTime.Now;
           var outputPath = Path.Combine("/home/ruediger/CEC6", Path.GetFileNameWithoutExtension(x.Path) + ".cec6.gz");
           try
           {
@@ -45,11 +52,11 @@ namespace IDS.KorAP.Cec6Processor
 
             var importer = new ImporterKorapOnlyTreeTagger();
             importer.Execute(new[] {x.Path}).FirstOrDefault()?.Save(outputPath, true);
-            Console.WriteLine($"{outputPath}...ok!");
+            Console.WriteLine($"{level}> {outputPath}...ok ({DateTime.Now - ts})!");
           }
           catch (Exception ex)
           {
-            Console.WriteLine($"{outputPath}...error!");
+            Console.WriteLine($"{level}> {outputPath}...error ({DateTime.Now - ts})!");
             try
             {
               File.AppendAllLines("error.log", new[]{outputPath, ex.Message, ex.StackTrace});
@@ -65,13 +72,15 @@ namespace IDS.KorAP.Cec6Processor
         if (parallel < 2)
           parallel = 2;
       } while (selected.Length > 0);
+
+      Console.WriteLine("!END!");
     }
 
     private static List<Entry> GetEntries()
     {
       var entries = new List<Entry>();
 
-      var lines = File.ReadAllLines("size.tsv", Encoding.UTF8);
+      var lines = File.ReadAllLines("catalog.tsv", Encoding.UTF8);
       foreach (var line in lines)
       {
         var entry = line.Split(new[] {"\t"}, StringSplitOptions.RemoveEmptyEntries);
@@ -89,10 +98,10 @@ namespace IDS.KorAP.Cec6Processor
       public long Size { get; set; }
       public string Path { get; set; }
 
-      public Entry(string path, string size)
+      public Entry(string corpus, string filename)
       {
-        Path = path;
-        Size = long.Parse(size);
+        Path = $"/vol/corpora/DeReKo/{corpus}/KorAP/zip/{filename}";
+        Size = (new FileInfo(Path)).Length;
       }
 
       public bool Valid(long min, long max)

@@ -50,19 +50,20 @@ namespace IDS.KorAP.CatalogBuilder
             continue;
 
           found++;
-          if (newest.ContainsKey(basePath))
+          var key = Path.GetFileName(basePath);
+          if (newest.ContainsKey(key))
           {
-            var key = newest[basePath];
-            newest[basePath] = release;
-            size[basePath] = baseSize;
-            catalog[key].Remove(basePath);
-            catalog[release].Add(basePath);
+            var ukey = newest[key];
+            newest[key] = release;
+            size[key] = baseSize;
+            catalog[ukey].Remove(key);
+            catalog[release].Add(key);
           }
           else
           {
-            newest.Add(basePath, release);
-            size.Add(basePath, baseSize);
-            catalog[release].Add(basePath);
+            newest.Add(key, release);
+            size.Add(key, baseSize);
+            catalog[release].Add(key);
           }
         }
 
