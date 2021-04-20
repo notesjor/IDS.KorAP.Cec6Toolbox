@@ -77,6 +77,8 @@ namespace IDS.KorAP.Cec6Processor
         parallel--;
         if (parallel < 2)
           parallel = 2;
+        min = max;
+        max *= 2;
       } while (selected.Length > 0);
 
       Console.WriteLine("!END!");
