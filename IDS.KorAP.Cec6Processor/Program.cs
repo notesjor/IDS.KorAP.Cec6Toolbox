@@ -49,11 +49,7 @@ namespace IDS.KorAP.Cec6Processor
               if (File.Exists(outputPath))
                 return;
 
-              var process = Process.Start(new ProcessStartInfo
-              {
-                FileName = "./IDS.KorAP.Cec6Processor.Thread",
-                Arguments = $"\"{x.Path}\" \"{outputPath}\"",
-              });
+              var process = Process.Start($"/home/ruediger/PROCESSOR/IDS.KorAP.Cec6Processor.Thread", new []{x.Path, outputPath});
               process.WaitForExit();
 
               var iSize = new FileInfo(x.Path).Length;
