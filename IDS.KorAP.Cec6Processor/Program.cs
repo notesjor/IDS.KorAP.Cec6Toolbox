@@ -1,13 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using System.Threading.Tasks;
-using CorpusExplorer.Sdk.Ecosystem;
-using CorpusExplorer.Sdk.Extern.Xml.Ids.KorAP;
-using CorpusExplorer.Sdk.Model.Adapter.Corpus;
 
 namespace IDS.KorAP.Cec6Processor
 {
@@ -15,16 +12,18 @@ namespace IDS.KorAP.Cec6Processor
   {
     static void Main(string[] args)
     {
+      Console.Write("THREADS: ");
+      var threads = int.Parse(Console.ReadLine());
+
+      var ignore = new[] { "wpd", "wpd", "wdd", "wud" };
       var entries = GetEntries();
 
       var level = 0;
-      var parallel = 10;
+      //var parallel = 10;
       long min = 0;
       long max = 25 * 1000 * 1000;
       Entry[] selected;
-
-      CorpusExplorerEcosystem.InitializeMinimal();
-
+      
       do
       {
         if (File.Exists("/home/ruediger/cec6processor.stop"))
@@ -35,63 +34,57 @@ namespace IDS.KorAP.Cec6Processor
         selected = entries.Where(x => x.Valid(min, max)).ToArray();
         Console.WriteLine($"ENTER {level}-LEVEL: {selected.Length} files");
 
-        Parallel.ForEach(selected, new ParallelOptions {MaxDegreeOfParallelism = parallel}, x =>
-        {
-          if (File.Exists("/home/ruediger/cec6processor.stop"))
-            return;
-
-          GC.Collect();
-
-          var ts = DateTime.Now;
-          var outputPath = Path.Combine("/home/ruediger/CEC6", Path.GetFileNameWithoutExtension(x.Path) + ".cec6.gz");
-          try
+        Parallel.ForEach(selected, new ParallelOptions { MaxDegreeOfParallelism = threads }, x =>
           {
-            if (File.Exists(outputPath))
-            {
-              Console.WriteLine($"{outputPath}...already done!");
+            if (File.Exists("/home/ruediger/cec6processor.stop"))
               return;
-            }
+            if (ignore.Any(prefix => Path.GetFileName(x.Path).StartsWith(prefix)))
+              return;
 
-            ProcessCorpus(x, outputPath);
 
-            var iSize = (new FileInfo(x.Path)).Length;
-            var oSize = (new FileInfo(outputPath)).Length;
-            var span = DateTime.Now - ts;
-
-            Console.WriteLine($"{level}> {outputPath}...ok ({span})! >>> in: {iSize / 1000}KB / out: {oSize / 1000}KB ({Math.Round(iSize / 1000.0 / span.TotalSeconds, 2)}KB/s)");
-          }
-          catch (Exception ex)
-          {
-            Console.WriteLine($"{level}> {outputPath}...error ({DateTime.Now - ts})!");
+            var ts = DateTime.Now;
+            var outputPath = Path.Combine("/home/ruediger/CEC6", Path.GetFileNameWithoutExtension(x.Path) + ".cec6.gz");
             try
             {
-              File.AppendAllLines("error.log", new[]{outputPath, ex.Message, ex.StackTrace});
-            }
-            catch
-            {
-              // ignore
-            }
-          }
-        });
+              if (File.Exists(outputPath))
+                return;
 
-        parallel--;
-        if (parallel < 2)
-          parallel = 2;
+              var process = Process.Start(new ProcessStartInfo
+              {
+                FileName = "./IDS.KorAP.Cec6Processor.Thread",
+                Arguments = $"\"{x.Path}\" \"{outputPath}\"",
+              });
+              process.WaitForExit();
+
+              var iSize = new FileInfo(x.Path).Length;
+              iSize += new FileInfo(x.Path.Replace(".zip", ".tree_tagger.zip")).Length;
+              var oSize = (new FileInfo(outputPath)).Length;
+              var span = DateTime.Now - ts;
+
+              Console.WriteLine($"{level}> {outputPath}...ok ({span})! >>> in: {iSize / 1000}KB / out: {oSize / 1000}KB ({Math.Round(iSize / 1000.0 / span.TotalSeconds, 2)}KB/s)");
+            }
+            catch (Exception ex)
+            {
+              Console.WriteLine($"{level}> {outputPath}...error ({DateTime.Now - ts})!");
+              try
+              {
+                File.AppendAllLines("error.log", new[] { outputPath, ex.Message, ex.StackTrace });
+              }
+              catch
+              {
+                // ignore
+              }
+            }
+          });
+
+        //parallel--;
+        //if (parallel < 2)
+        //  parallel = 2;
         min = max;
         max *= 2;
       } while (selected.Length > 0);
 
       Console.WriteLine("!END!");
-    }
-
-    private static void ProcessCorpus(Entry x, string outputPath)
-    {
-      var importer = new ImporterKorapInMemory();
-      var corpus = importer.Execute(new[] {x.Path}).FirstOrDefault();
-      corpus?.Save(outputPath, true);
-      if(corpus is IDisposable c)
-        c.Dispose();
-      importer.Dispose();
     }
 
     private static List<Entry> GetEntries()
@@ -101,7 +94,7 @@ namespace IDS.KorAP.Cec6Processor
       var lines = File.ReadAllLines("catalog.tsv", Encoding.UTF8);
       foreach (var line in lines)
       {
-        var entry = line.Split(new[] {"\t"}, StringSplitOptions.RemoveEmptyEntries);
+        var entry = line.Split(new[] { "\t" }, StringSplitOptions.RemoveEmptyEntries);
         if (entry.Length != 2)
           continue;
 
