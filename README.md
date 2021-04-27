@@ -24,3 +24,7 @@ IDS.KorAP.Cec6Processor /current/corpus.zip /output/corpus.cec6.gz
 ## IDS.KorAP.Cec6Toolbox.TimeModelBuilder
 
 Baut aus den Dateien von IDS.KorAP.Cec6Processor.Thread ein Time-Model.
+
+## IDS.KorAP.Cec6Toolbox.Validator
+
+Überprüft die Ausgabe-Dateien von IDS.KorAP.Cec6Processor.Thread

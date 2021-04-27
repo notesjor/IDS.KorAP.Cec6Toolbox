@@ -19,7 +19,16 @@ namespace IDS.KorAP.Cec6Processor.Thread
 
       try
       {
-        var importer = new ImporterKorap { Strategy = args[0].EndsWith(".zip") ? new LoadStrategyMemory() : new LoadStrategyExtractedDirectory(), Debug = debug };
+        var importer = new ImporterKorap
+        {
+          Strategy = args[0].EndsWith(".zip") ? new LoadStrategyMemory() : new LoadStrategyExtractedDirectory(), 
+          Debug = debug,
+          ImportCoreNlp = false,
+          ImportMalt = false,
+          ImportMarmot = false,
+          ImportOpenNlp = false,
+          ImportTreeTagger = true
+        };
         var corpus = importer.Execute(new[] { args[0] }).FirstOrDefault();
         corpus?.Save(args[1], true);
         if (corpus is IDisposable c)
