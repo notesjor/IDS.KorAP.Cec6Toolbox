@@ -17,15 +17,12 @@ namespace IDS.KorAP.CatalogBuilder
       foreach (var dir in dirs)
         Console.WriteLine($"\t{dir}");
 
-      var newest = new Dictionary<string, string>();
-      var size = new Dictionary<string, long>();
-      var catalog = new Dictionary<string, List<string>>();
+      var entries = new Dictionary<string, Entry>();
 
       Console.WriteLine("RESULTS:");
       foreach (var dir in dirs)
       {
         var release = dir.Replace("/vol/corpora/DeReKo/", "");
-        catalog.Add(release, new List<string>());
 
         var korapDir = Path.Combine(dir, "KorAP/zip/");
         if (!Directory.Exists(korapDir))
@@ -40,39 +37,40 @@ namespace IDS.KorAP.CatalogBuilder
 
         foreach (var file in files)
         {
-          if (new FileInfo(file).Length < 100)
+          var size = new FileInfo(file).Length;
+          if (size < 100)
             continue;
           var basePath = file.Replace(".tree_tagger.", ".");
           if (!File.Exists(basePath))
             continue;
-          var baseSize = new FileInfo(basePath).Length;
-          if (baseSize < 100)
-            continue;
 
           found++;
           var key = Path.GetFileName(basePath);
-          if (newest.ContainsKey(key))
+          if (entries.ContainsKey(key))
           {
-            var ukey = newest[key];
-            newest[key] = release;
-            size[key] = baseSize;
-            catalog[ukey].Remove(key);
-            catalog[release].Add(key);
+            entries[key].Size = size;
+            entries[key].Versions.Add(release);
           }
           else
           {
-            newest.Add(key, release);
-            size.Add(key, baseSize);
-            catalog[release].Add(key);
+            var newEntry = new Entry { Size = size };
+            newEntry.Versions.Add(release);
+            entries.Add(key, newEntry);
           }
         }
 
         Console.WriteLine($"{found}!");
       }
 
-      File.WriteAllLines("newest.tsv", newest.Select(x=> $"{x.Key}\t{x.Value}"), Encoding.UTF8);
-      File.WriteAllLines("size.tsv", size.Select(x => $"{x.Key}\t{x.Value}"), Encoding.UTF8);
-      File.WriteAllLines("catalog.tsv", (from x in catalog from y in x.Value select $"{x.Key}\t{y}"), Encoding.UTF8);
+      File.WriteAllLines("size.tsv", entries.Select(x => $"{x.Key}\t{x.Value.Size}"), Encoding.UTF8);
+      File.WriteAllLines("catalog.tsv", entries.Select(x => $"{x.Value.LastVersion}\t{x.Key}"), Encoding.UTF8);
+    }
+
+    public class Entry
+    {
+      public List<string> Versions { get; set; } = new List<string>();
+      public string LastVersion => Versions.Last();
+      public long Size { get; set; }
     }
   }
 }

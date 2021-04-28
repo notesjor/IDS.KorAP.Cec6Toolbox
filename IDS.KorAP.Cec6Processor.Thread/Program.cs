@@ -13,7 +13,7 @@ namespace IDS.KorAP.Cec6Processor.Thread
   {
     static void Main(string[] args)
     {
-      var dir = "/home/ruediger/PROCESSOR/error/"; // siehe IDS.KorAP.Cec6Processor > Program.cs
+      var dir = "/home/ruediger/TOOLBOX/PROCESSOR/error/"; // siehe IDS.KorAP.Cec6Processor > Program.cs
       var debug = File.Exists(Path.Combine(dir, "debug.flag"));
       CorpusExplorerEcosystem.InitializeMinimal();
 

@@ -12,7 +12,7 @@ namespace IDS.KorAP.Cec6Processor
   {
     static void Main(string[] args)
     {
-      var dir = "/home/ruediger/PROCESSOR/error/"; // siehe IDS.KorAP.Cec6Processor.Thread > Program.cs
+      var dir = "/home/ruediger/TOOLBOX/PROCESSOR/error/"; // siehe IDS.KorAP.Cec6Processor.Thread > Program.cs
       if (!Directory.Exists(dir))
         Directory.CreateDirectory(dir);
 
@@ -53,7 +53,7 @@ namespace IDS.KorAP.Cec6Processor
               if (File.Exists(outputPath))
                 return;
 
-              var process = Process.Start($"/home/ruediger/PROCESSOR/IDS.KorAP.Cec6Processor.Thread", new []{x.Path, outputPath});
+              var process = Process.Start("/home/ruediger/TOOLBOX/PROCESSOR/IDS.KorAP.Cec6Processor.Thread", new []{x.Path, outputPath});
               process.WaitForExit();
 
               var iSize = new FileInfo(x.Path).Length;
