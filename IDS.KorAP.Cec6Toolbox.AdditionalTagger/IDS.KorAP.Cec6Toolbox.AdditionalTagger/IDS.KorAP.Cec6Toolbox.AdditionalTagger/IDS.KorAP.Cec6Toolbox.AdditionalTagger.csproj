@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net5.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="BitCutStudios.CorpusExplorer">
+      <HintPath>..\..\..\..\..\CorpusExplorerV2\CorpusExplorer\CorpusExplorer.Sdk.Extern.Xml\bin\Debug\BitCutStudios.CorpusExplorer.dll</HintPath>
+    </Reference>
+    <Reference Include="CorpusExplorer.Core">
+      <HintPath>..\..\..\..\..\CorpusExplorerV2\CorpusExplorer\CorpusExplorer.Sdk.Extern.Xml\bin\Debug\CorpusExplorer.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="CorpusExplorer.Sdk">
+      <HintPath>..\..\..\..\..\CorpusExplorerV2\CorpusExplorer\CorpusExplorer.Sdk.Extern.Xml\bin\Debug\CorpusExplorer.Sdk.dll</HintPath>
+    </Reference>
+    <Reference Include="CorpusExplorer.Sdk.Diagnostic">
+      <HintPath>..\..\..\..\..\CorpusExplorerV2\CorpusExplorer\CorpusExplorer.Sdk.Extern.Xml\bin\Debug\CorpusExplorer.Sdk.Diagnostic.dll</HintPath>
+    </Reference>
+    <Reference Include="CorpusExplorer.Sdk.Extern.Xml">
+      <HintPath>..\..\..\..\..\CorpusExplorerV2\CorpusExplorer\CorpusExplorer.Sdk.Extern.Xml\bin\Debug\CorpusExplorer.Sdk.Extern.Xml.dll</HintPath>
+    </Reference>
+    <Reference Include="HtmlAgilityPack">
+      <HintPath>..\..\..\..\..\CorpusExplorerV2\CorpusExplorer\CorpusExplorer.Sdk.Extern.Xml\bin\Debug\HtmlAgilityPack.dll</HintPath>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\..\..\..\..\CorpusExplorerV2\CorpusExplorer\CorpusExplorer.Sdk.Extern.Xml\bin\Debug\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="Polenter.SharpSerializer">
+      <HintPath>..\..\..\..\..\CorpusExplorerV2\CorpusExplorer\CorpusExplorer.Sdk.Extern.Xml\bin\Debug\Polenter.SharpSerializer.dll</HintPath>
+    </Reference>
+    <Reference Include="PostSharp">
+      <HintPath>..\..\..\..\..\CorpusExplorerV2\CorpusExplorer\CorpusExplorer.Sdk.Extern.Xml\bin\Debug\PostSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="Telerik.Windows.Documents.Core">
+      <HintPath>..\..\..\..\..\CorpusExplorerV2\CorpusExplorer\CorpusExplorer.Sdk.Extern.Xml\bin\Debug\Telerik.Windows.Documents.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Telerik.Windows.Documents.Fixed">
+      <HintPath>..\..\..\..\..\CorpusExplorerV2\CorpusExplorer\CorpusExplorer.Sdk.Extern.Xml\bin\Debug\Telerik.Windows.Documents.Fixed.dll</HintPath>
+    </Reference>
+    <Reference Include="Telerik.Windows.Documents.Flow">
+      <HintPath>..\..\..\..\..\CorpusExplorerV2\CorpusExplorer\CorpusExplorer.Sdk.Extern.Xml\bin\Debug\Telerik.Windows.Documents.Flow.dll</HintPath>
+    </Reference>
+    <Reference Include="Telerik.Windows.Zip">
+      <HintPath>..\..\..\..\..\CorpusExplorerV2\CorpusExplorer\CorpusExplorer.Sdk.Extern.Xml\bin\Debug\Telerik.Windows.Zip.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>
