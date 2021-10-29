@@ -16,7 +16,7 @@ namespace IDS.KorAP.Cec6Toolbox.SelectDocumentsBySigle
     {
       CorpusExplorerEcosystem.InitializeMinimal();
 
-      if (args.Length != 2)
+      if (args.Length != 3)
       {
         Help();
         return;
