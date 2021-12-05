@@ -12,6 +12,11 @@ namespace IDS.KorAP.Cec6Toolbox.Corpuslist2Index
     private Dictionary<string, int> _c2i = new Dictionary<string, int>();
     private Dictionary<int, string> _i2c = new Dictionary<int, string>();
 
+    public CorpuslistIndex(string pathIndex)
+    {
+      Load(pathIndex);
+    }
+
     public CorpuslistIndex(string pathIndex, IEnumerable<string> pathCorpora)
     {
       if (File.Exists(pathIndex))
