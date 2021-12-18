@@ -15,6 +15,7 @@ namespace IDS.KorAP.Cec6Toolbox.WordlistExtractor
     static void Main(string[] args)
     {
       CorpusExplorerEcosystem.InitializeMinimal();
+      var utf8WithoutBom = new UTF8Encoding(false);
 
       var layer = args[0];
       var pathInput = args[1];
@@ -30,6 +31,8 @@ namespace IDS.KorAP.Cec6Toolbox.WordlistExtractor
       var fCount = 0;
       var fCountLock = new object();
 
+      var error = pathOutput + ".error";
+
       // Erstelle Listen
       Parallel.ForEach(files, new ParallelOptions { MaxDegreeOfParallelism = parallelMax }, file =>
       {
@@ -44,13 +47,14 @@ namespace IDS.KorAP.Cec6Toolbox.WordlistExtractor
           if (values == null)
             return;
 
-          File.WriteAllLines(fn, values, Encoding.UTF8);
+          File.WriteAllLines(fn, values, utf8WithoutBom);
           lock (fCountLock)
             Console.WriteLine($"{++fCount:D5}/{files.Length}: {file} (in {(DateTime.Now - ts).Seconds}s)");
         }
-        catch
+        catch (Exception ex)
         {
-          // ignore
+          lock(fCountLock)
+            File.AppendAllLines(error, new[]{ ex.Message, ex.StackTrace }, utf8WithoutBom);
         }
       });
 
@@ -71,7 +75,7 @@ namespace IDS.KorAP.Cec6Toolbox.WordlistExtractor
         // Schritt 1 - Lade Chunk-Liste
         var hashSet = new HashSet<string>();
         foreach (var file in chunk)
-          foreach (var line in File.ReadAllLines(file, Encoding.UTF8))
+          foreach (var line in File.ReadAllLines(file, utf8WithoutBom))
             hashSet.Add(line);
 
         lock (lstLock)
@@ -79,7 +83,7 @@ namespace IDS.KorAP.Cec6Toolbox.WordlistExtractor
           // Schritt 2 - Bereinige Chunk-Liste
           using (var fs = new FileStream(pathOutputFile, FileMode.Open, FileAccess.Read))
           using (var buffer = new BufferedStream(fs, 4096))
-          using (var reader = new StreamReader(buffer, Encoding.UTF8))
+          using (var reader = new StreamReader(buffer, utf8WithoutBom))
           {
             while (!reader.EndOfStream)
             {
@@ -91,7 +95,7 @@ namespace IDS.KorAP.Cec6Toolbox.WordlistExtractor
           }
 
           // Schritt 3 - Schreibe Chunk-Liste
-          File.AppendAllLines(pathOutputFile, hashSet, Encoding.UTF8);
+          File.AppendAllLines(pathOutputFile, hashSet, utf8WithoutBom);
           lock (fCountLock)
             Console.WriteLine($"{++fCount:D4}/{chunks.Length:D4} (in {(DateTime.Now - ts).Seconds}s)");
         }
