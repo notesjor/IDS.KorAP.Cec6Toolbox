@@ -31,7 +31,7 @@ namespace IDS.KorAP.Cec6Toolbox.SimpleCounter
       var idx = new EasyRocksDb(config.RDBWordlist, false);
       var output = config.PathOutput;
 
-      PrepareEnviroment(output,  out var outputC);
+      PrepareEnviroment(output, out var outputC);
       var outputFile = Path.Combine(output, "frequency.dat");
       var errorFile = Path.Combine(output, "error.log");
       var outputFileLock = new object();
@@ -87,12 +87,12 @@ namespace IDS.KorAP.Cec6Toolbox.SimpleCounter
                          catch (Exception ex)
                          {
                            lock (outputFileLock)
-                             File.AppendAllLines(errorFile, new []{ex.Message, ex.StackTrace, ""}, Encoding.UTF8);
+                             File.AppendAllLines(errorFile, new[] { ex.Message, ex.StackTrace, "" }, Encoding.UTF8);
                          }
                        });
     }
 
-    private static string Convert(int val) 
+    private static string Convert(int val)
       => string.Join("", BitConverter.GetBytes(val).Select(System.Convert.ToChar));
 
     private static ConfigModel LoadConfig(string path)
