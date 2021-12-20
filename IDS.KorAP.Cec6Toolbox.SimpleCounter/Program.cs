@@ -22,6 +22,9 @@ namespace IDS.KorAP.Cec6Toolbox.SimpleCounter
 {
   class Program
   {
+    private static object _lockOutputFile = new object();
+    private static object _lockErrorFile = new object();
+
     static void Main(params string[] arguments)
     {
       CorpusExplorerEcosystem.InitializeMinimal();
@@ -41,19 +44,18 @@ namespace IDS.KorAP.Cec6Toolbox.SimpleCounter
       PrepareEnviroment(output, out var outputC);
       var outputFile = Path.Combine(output, "frequency.dat");
       var errorFile = Path.Combine(output, "error.log");
-      var outputFileLock = new object();
 
       if (config.UseSubDirs)
       {
-        ProcessSubDirs(dir, parallel, lst, idx, outputC, outputFile, errorFile, outputFileLock);
+        ProcessSubDirs(dir, parallel, lst, idx, outputC, outputFile, errorFile);
       }
       else
       {
-        ProcessDirectory(dir, parallel, lst, idx, outputC, outputFile, errorFile, outputFileLock);
+        ProcessDirectory(dir, parallel, lst, idx, outputC, outputFile, errorFile);
       }
     }
 
-    private static void ProcessSubDirs(string dir, int parallel, CorpuslistIndex lst, EasyRocksDb idx, string outputC, string outputFile, string errorFile, object outputFileLock)
+    private static void ProcessSubDirs(string dir, int parallel, CorpuslistIndex lst, EasyRocksDb idx, string outputC, string outputFile, string errorFile)
     {
       Parallel.ForEach(Directory.GetDirectories(dir), new ParallelOptions { MaxDegreeOfParallelism = parallel },
                        directory =>
@@ -79,17 +81,17 @@ namespace IDS.KorAP.Cec6Toolbox.SimpleCounter
 
                            Console.WriteLine($"{directory} [{cid:D6} - files: {files.Length}]...");
 
-                           Process(idx, outputFile, errorFile, outputFileLock, block.Frequency, cid, outC, corpus, cname);
+                           Process(idx, outputFile, errorFile, block.Frequency, cid, outC, corpus, cname);
                          }
                          catch (Exception ex)
                          {
-                           lock (outputFileLock)
+                           lock (_lockErrorFile)
                              File.AppendAllLines(errorFile, new[] { ex.Message, ex.StackTrace, "" }, Encoding.UTF8);
                          }
                        });
     }
 
-    private static void ProcessDirectory(string dir, int parallel, CorpuslistIndex lst, EasyRocksDb idx, string outputC, string outputFile, string errorFile, object outputFileLock)
+    private static void ProcessDirectory(string dir, int parallel, CorpuslistIndex lst, EasyRocksDb idx, string outputC, string outputFile, string errorFile)
     {
       Parallel.ForEach(Directory.GetFiles(dir, "*.cec6.gz", SearchOption.TopDirectoryOnly),
                        new ParallelOptions { MaxDegreeOfParallelism = parallel },
@@ -112,11 +114,11 @@ namespace IDS.KorAP.Cec6Toolbox.SimpleCounter
                            block.LayerDisplayname = "Wort";
                            block.Calculate();
 
-                           Process(idx, outputFile, errorFile, outputFileLock, block.Frequency, cid, outC, corpus, file);
+                           Process(idx, outputFile, errorFile, block.Frequency, cid, outC, corpus, file);
                          }
                          catch (Exception ex)
                          {
-                           lock (outputFileLock)
+                           lock (_lockErrorFile)
                              File.AppendAllLines(errorFile, new[] { ex.Message, ex.StackTrace, "" }, Encoding.UTF8);
                          }
                        });
@@ -124,19 +126,18 @@ namespace IDS.KorAP.Cec6Toolbox.SimpleCounter
 
     private static object idxLock = new object();
 
-    private static void Process<T>(EasyRocksDb idx, string outputFile, string errorFile, object outputFileLock,
+    private static void Process<T>(EasyRocksDb idx, string outputFile, string errorFile,
                                 T data, int cid, string outC, CorpusAdapterWriteDirect corpus, string label)
     {
-      var rlock = new object();
       var res = new StringBuilder();
 
       if (data is Dictionary<string, double> input)
       {
         Dictionary<string, string> keys;
         lock (idxLock)
-          keys = idx.GetBatch(input.Keys.ToArray()).ToDictionary(x=>x.Key, x=>x.Value);
+          keys = idx.GetBatch(input.Keys.ToArray()).ToDictionary(x => x.Key, x => x.Value);
 
-        Parallel.ForEach(input, f =>
+        foreach (var f in input)
         {
           try
           {
@@ -148,29 +149,31 @@ namespace IDS.KorAP.Cec6Toolbox.SimpleCounter
                 // var secT = Convert(tId);
                 // var secF = Convert((int)f.Value);
 
-                var val = $"{Convert(cid)}{Convert(tId)}{Convert((int)f.Value)}\n";
-
-                lock (rlock)
-                  res.Append(val);
+                res.Append($"{Convert(cid)}{Convert(tId)}{Convert((int)f.Value)}\n");
               }
               else
               {
                 Console.WriteLine($"Cannot parse {f.Key} - {keys[f.Key]}");
+                lock (_lockErrorFile)
+                  File.AppendAllLines(errorFile + ".lst", new[] { f.Key }, Encoding.UTF8);
               }
             }
             else
             {
               Console.WriteLine($"{f.Key} not found in dict.");
+              lock (_lockErrorFile)
+                File.AppendAllLines(errorFile + ".lst", new[] { f.Key }, Encoding.UTF8);
             }
           }
           catch (Exception ex)
           {
-            lock (outputFileLock)
+            lock (_lockErrorFile)
               File.AppendAllLines(errorFile, new[] { ex.Message, ex.StackTrace, "" }, Encoding.UTF8);
           }
-        });}
+        }
+      }
 
-      lock (outputFileLock)
+      lock (_lockOutputFile)
         File.AppendAllText(outputFile, res.ToString(), Encoding.ASCII);
 
       File.WriteAllText(outC, corpus.CountToken.ToString(), Encoding.ASCII);
