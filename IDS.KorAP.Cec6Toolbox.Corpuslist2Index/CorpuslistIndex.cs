@@ -60,7 +60,16 @@ namespace IDS.KorAP.Cec6Toolbox.Corpuslist2Index
           var idx = _c2i.Count;
           _c2i.Add(file, idx);
           _i2c.Add(idx, file);
+
           res = true;
+
+          var parent = Path.GetDirectoryName(file);
+          if (_c2i.ContainsKey(parent))
+            continue;
+
+          idx = _c2i.Count;
+          _c2i.Add(parent, idx);
+          _i2c.Add(idx, parent);
         }
       }
 
