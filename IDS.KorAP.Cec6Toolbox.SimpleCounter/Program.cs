@@ -122,9 +122,9 @@ namespace IDS.KorAP.Cec6Toolbox.SimpleCounter
                        });
     }
 
-    private object idxLock = new object();
+    private static object idxLock = new object();
 
-    private void Process<T>(EasyRocksDb idx, string outputFile, string errorFile, object outputFileLock,
+    private static void Process<T>(EasyRocksDb idx, string outputFile, string errorFile, object outputFileLock,
                                 T data, int cid, string outC, CorpusAdapterWriteDirect corpus, string label)
     {
       var rlock = new object();
@@ -140,16 +140,28 @@ namespace IDS.KorAP.Cec6Toolbox.SimpleCounter
         {
           try
           {
-            var tId = int.Parse(idx.Get(f.Key));
+            if (keys.ContainsKey(f.Key))
+            {
+              if (int.TryParse(keys[f.Key], out var tId))
+              {
+                // var secC = Convert(cid);
+                // var secT = Convert(tId);
+                // var secF = Convert((int)f.Value);
 
-            // var secC = Convert(cid);
-            // var secT = Convert(tId);
-            // var secF = Convert((int)f.Value);
+                var val = $"{Convert(cid)}{Convert(tId)}{Convert((int)f.Value)}\n";
 
-            var val = $"{Convert(cid)}{Convert(tId)}{Convert((int)f.Value)}\n";
-
-            lock (rlock)
-              res.Append(val);
+                lock (rlock)
+                  res.Append(val);
+              }
+              else
+              {
+                Console.WriteLine($"Cannot parse {f.Key} - {keys[f.Key]}");
+              }
+            }
+            else
+            {
+              Console.WriteLine($"{f.Key} not found in dict.");
+            }
           }
           catch (Exception ex)
           {
