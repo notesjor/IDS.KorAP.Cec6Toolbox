@@ -24,6 +24,10 @@ namespace IDS.KorAP.Cec6Toolbox.SimpleCounter
       CorpusExplorerEcosystem.InitializeMinimal();
 
       var config = LoadConfig(arguments[0]);
+      Console.WriteLine($"{arguments[0]}... loaded!");
+      Console.WriteLine($"parallel: {config.Parallel}");
+      Console.WriteLine($"input (subdir: {config.UseSubDirs}): {config.Cec6InputDir}");
+      Console.WriteLine($"output: {config.PathOutput}");
 
       var parallel = config.Parallel;
       var dir = config.Cec6InputDir;
@@ -36,7 +40,28 @@ namespace IDS.KorAP.Cec6Toolbox.SimpleCounter
       var errorFile = Path.Combine(output, "error.log");
       var outputFileLock = new object();
 
-      Parallel.ForEach(Directory.GetFiles(dir, "*.cec6.gz", SearchOption.AllDirectories),
+      if (config.UseSubDirs)
+      {
+        ProcessSubDirs(dir, parallel, lst, idx, outputC, outputFile, errorFile, outputFileLock);
+      }
+      else
+      {
+        ProcessDirectory(dir, parallel, lst, idx, outputC, outputFile, errorFile, outputFileLock);
+      }
+    }
+
+    private static void ProcessSubDirs(string dir, int parallel, CorpuslistIndex lst, EasyRocksDb idx, string outputC, string outputFile, string errorFile, object outputFileLock)
+    {
+      Parallel.ForEach(Directory.GetDirectories(dir), new ParallelOptions { MaxDegreeOfParallelism = parallel },
+                       directory =>
+                       {
+
+                       })
+    }
+
+    private static void ProcessDirectory(string dir, int parallel, CorpuslistIndex lst, EasyRocksDb idx, string outputC, string outputFile, string errorFile, object outputFileLock)
+    {
+      Parallel.ForEach(Directory.GetFiles(dir, "*.cec6.gz", SearchOption.TopDirectoryOnly),
                        new ParallelOptions { MaxDegreeOfParallelism = parallel },
                        file =>
                        {

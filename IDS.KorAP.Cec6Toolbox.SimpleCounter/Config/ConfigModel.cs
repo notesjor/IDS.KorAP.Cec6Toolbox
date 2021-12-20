@@ -7,5 +7,6 @@
     public string PathCorpuslist { get; set; } = "/home/ruediger/PROJECTS/CORPUSLIST/corpus_cec6_and_cec6time.lst";
     public string RDBWordlist { get; set; } = "/home/ruediger/PROJECTS/WORDLIST/Step02-MakeIndex/w2i";
     public string PathOutput { get; set; } = "/home/ruediger/PROJECTS/WORDLIST/Step03-SimpleCount";
+    public bool UseSubDirs { get; set; } = false;
   }
 }
