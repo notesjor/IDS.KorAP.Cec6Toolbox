@@ -4,9 +4,11 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using CorpusExplorer.Sdk.Blocks;
 using CorpusExplorer.Sdk.Ecosystem;
 using CorpusExplorer.Sdk.Helper;
 using CorpusExplorer.Sdk.Model.Adapter.Corpus;
+using CorpusExplorer.Sdk.Model.Extension;
 
 namespace IDS.KorAP.Cec6Toolbox.WordlistExtractor
 {
@@ -32,6 +34,8 @@ namespace IDS.KorAP.Cec6Toolbox.WordlistExtractor
       var fCountLock = new object();
 
       var error = pathOutput + ".error";
+      var gcCount = 0;
+      var gcLock = new object();
 
       // Erstelle Listen
       Parallel.ForEach(files, new ParallelOptions { MaxDegreeOfParallelism = parallelMax }, file =>
@@ -43,18 +47,37 @@ namespace IDS.KorAP.Cec6Toolbox.WordlistExtractor
             return;
           var ts = DateTime.Now;
 
-          var values = CorpusAdapterWriteDirect.Create(file).GetLayers(layer).FirstOrDefault()?.Values?.ToArray();
+          var corpus = CorpusAdapterWriteDirect.Create(file);
+          var select = corpus.ToSelection();
+          var block = select.CreateBlock<Frequency1LayerBlock>();
+          block.LayerDisplayname = layer;
+          block.Calculate();
+
+          var values = block.Frequency?.Keys.ToArray();
           if (values == null)
             return;
 
           File.WriteAllLines(fn, values, utf8WithoutBom);
           lock (fCountLock)
             Console.WriteLine($"{++fCount:D5}/{files.Length}: {file} (in {(DateTime.Now - ts).Seconds}s)");
+
+          block.Frequency.Clear();
+          corpus.Dispose();
         }
         catch (Exception ex)
         {
           lock(fCountLock)
             File.AppendAllLines(error, new[]{ ex.Message, ex.StackTrace }, utf8WithoutBom);
+        }
+
+        lock (gcLock)
+        {
+          gcCount++;
+          if (gcCount < 100) 
+            return;
+
+          gcCount = 0;
+          GC.Collect();
         }
       });
 

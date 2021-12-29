@@ -51,6 +51,8 @@ namespace IDS.KorAP.Cec6Toolbox.Wordlist2Index
         i2t.Clear();
       }
 
+      File.WriteAllText("idx", idx.ToString());
+
       w2i.Dispose();
       i2w.Dispose();
     }

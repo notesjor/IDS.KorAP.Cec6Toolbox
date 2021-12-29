@@ -9,7 +9,6 @@ namespace Compute.DeReKo.Cec6TimeMergeHelper
 {
   class Program
   {
-    private static string _appDir = "/home/ruediger/TOOLBOX/CEC6TIME/Compute.DeReKo.Cec6TimeMergeHelper";
     private static string _inputDir = "/home/ruediger/CEC6-TIME";
     private static string _outputDir = "/home/ruediger/CEC6-TIME-MERGED";
     private static string _unknownDir = "/home/ruediger/CEC6-TIME-UNDONE";

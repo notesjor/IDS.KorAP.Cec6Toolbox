@@ -22,12 +22,18 @@ namespace IDS.KorAP.Cec6Toolbox.SimpleCounter
 {
   class Program
   {
-    private static object _lockOutputFile = new object();
-    private static object _lockErrorFile = new object();
+    private static int _idx;
+    private static object _idxLock = new object();
+    private static string _idxPath;
+    private static string _killFlag = "stop.flag";
+    private static byte[] _eol = new byte[] { (byte)'\n' };
 
     static void Main(params string[] arguments)
     {
       CorpusExplorerEcosystem.InitializeMinimal();
+
+      if (File.Exists(_killFlag))
+        File.Delete(_killFlag);
 
       var config = LoadConfig(arguments[0]);
       Console.WriteLine($"{arguments[0]}... loaded!");
@@ -38,37 +44,42 @@ namespace IDS.KorAP.Cec6Toolbox.SimpleCounter
       var parallel = config.Parallel;
       var dir = config.Cec6InputDir;
       var lst = new CorpuslistIndex(config.PathCorpuslist);
-      var idx = new EasyRocksDb(config.RDBWordlist, false);
+      var w2i = new EasyRocksDb(config.RDBWordlist + "/w2i", true);
+      var i2w = new EasyRocksDb(config.RDBWordlist + "/i2w", true);
+      _idxPath = config.RDBWordlist + "/idx";
+      _idx = int.Parse(File.ReadAllText(_idxPath));
       var output = config.PathOutput;
 
-      PrepareEnviroment(output, out var outputC);
-      var outputFile = Path.Combine(output, "frequency.dat");
-      var errorFile = Path.Combine(output, "error.log");
+      PrepareEnviroment(output, out var outputDirectory);
 
       if (config.UseSubDirs)
       {
-        ProcessSubDirs(dir, parallel, lst, idx, outputC, outputFile, errorFile);
+        ProcessSubDirs(dir, parallel, lst, w2i, i2w, outputDirectory);
       }
       else
       {
-        ProcessDirectory(dir, parallel, lst, idx, outputC, outputFile, errorFile);
+        ProcessDirectory(dir, parallel, lst, w2i, i2w, outputDirectory);
       }
     }
 
-    private static void ProcessSubDirs(string dir, int parallel, CorpuslistIndex lst, EasyRocksDb idx, string outputC, string outputFile, string errorFile)
+    private static void ProcessSubDirs(string dir, int parallel, CorpuslistIndex lst, EasyRocksDb w2i, EasyRocksDb i2w, string outputDirectory)
     {
       Parallel.ForEach(Directory.GetDirectories(dir), new ParallelOptions { MaxDegreeOfParallelism = parallel },
                        directory =>
                        {
+                         if (File.Exists(_killFlag))
+                           return;
+
+                         if (directory.EndsWith("/"))
+                           directory = directory.Substring(0, directory.Length - 1);
+
+                         var name = directory.Replace(Path.GetDirectoryName(directory), "").Replace("/", "");
+                         var pathErr = Path.Combine(outputDirectory, name + ".err");
+
                          try
                          {
-                           if (directory.EndsWith("/"))
-                             directory = directory.Substring(0, directory.Length - 1);
-
                            var cid = lst[directory];
-                           var cname = directory.Replace(Path.GetDirectoryName(directory), "").Replace("/", "") + ".freq";
-                           var outC = Path.Combine(outputC, cname);
-                           if (File.Exists(outC))
+                           if (File.Exists(Path.Combine(outputDirectory, name + ".dat")))
                              return;
 
                            var files = Directory.GetFiles(directory, "*.cec6.gz", SearchOption.AllDirectories);
@@ -81,28 +92,31 @@ namespace IDS.KorAP.Cec6Toolbox.SimpleCounter
 
                            Console.WriteLine($"{directory} [{cid:D6} - files: {files.Length}]...");
 
-                           Process(idx, outputFile, errorFile, block.Frequency, cid, outC, corpus, cname);
+                           Process(w2i, i2w, block.Frequency, cid, outputDirectory, name);
                          }
                          catch (Exception ex)
                          {
-                           lock (_lockErrorFile)
-                             File.AppendAllLines(errorFile, new[] { ex.Message, ex.StackTrace, "" }, Encoding.UTF8);
+                           File.AppendAllLines(pathErr, new[] { ex.Message, ex.StackTrace, "" }, Encoding.UTF8);
                          }
                        });
     }
 
-    private static void ProcessDirectory(string dir, int parallel, CorpuslistIndex lst, EasyRocksDb idx, string outputC, string outputFile, string errorFile)
+    private static void ProcessDirectory(string dir, int parallel, CorpuslistIndex lst, EasyRocksDb w2i, EasyRocksDb i2w, string outputDirectory)
     {
       Parallel.ForEach(Directory.GetFiles(dir, "*.cec6.gz", SearchOption.TopDirectoryOnly),
                        new ParallelOptions { MaxDegreeOfParallelism = parallel },
                        file =>
                        {
+                         if (File.Exists(_killFlag))
+                           return;
+
+                         var name = file.Replace(dir, "").Replace("/", "_-_").Replace(".cec6.gz", "");
+                         var pathErr = Path.Combine(outputDirectory, name + ".err");
+
                          try
                          {
                            var cid = lst[file];
-                           var cname = file.Replace(dir, "").Replace("/", "_-_").Replace(".cec6.gz", ".freq");
-                           var outC = Path.Combine(outputC, cname);
-                           if (File.Exists(outC))
+                           if (File.Exists(Path.Combine(outputDirectory, name + ".dat")))
                              return;
 
                            Console.WriteLine($"{file} [{cid:D6}]...");
@@ -114,75 +128,98 @@ namespace IDS.KorAP.Cec6Toolbox.SimpleCounter
                            block.LayerDisplayname = "Wort";
                            block.Calculate();
 
-                           Process(idx, outputFile, errorFile, block.Frequency, cid, outC, corpus, file);
+                           Process(w2i, i2w, block.Frequency, cid, outputDirectory, name);
                          }
                          catch (Exception ex)
                          {
-                           lock (_lockErrorFile)
-                             File.AppendAllLines(errorFile, new[] { ex.Message, ex.StackTrace, "" }, Encoding.UTF8);
+                           File.AppendAllLines(pathErr, new[] { ex.Message, ex.StackTrace, "" }, Encoding.UTF8);
                          }
                        });
     }
 
-    private static object idxLock = new object();
-
-    private static void Process<T>(EasyRocksDb idx, string outputFile, string errorFile,
-                                T data, int cid, string outC, CorpusAdapterWriteDirect corpus, string label)
+    private static void Process<T>(EasyRocksDb w2i, EasyRocksDb i2w, T data, int cid, string outputDirectory, string name)
     {
-      var res = new StringBuilder();
+      var pathOut = Path.Combine(outputDirectory, name + ".dat");
+      var pathErr = Path.Combine(outputDirectory, name + ".err");
+      var pathSum = Path.Combine(outputDirectory, name + ".sum");
 
-      if (data is Dictionary<string, double> input)
-      {
-        Dictionary<string, string> keys;
-        lock (idxLock)
-          keys = idx.GetBatch(input.Keys.ToArray()).ToDictionary(x => x.Key, x => x.Value);
+      var sum = 0.0;
+      var unks = new Dictionary<string, int>();
 
-        foreach (var f in input)
+      using (var fs = new FileStream(pathOut, FileMode.Create, FileAccess.Write))
+      using (var buffer = new BufferedStream(fs))
+        if (data is Dictionary<string, double> input)
         {
-          try
+          Dictionary<string, string> keys;
+          keys = w2i.GetBatch(input.Keys.ToArray()).ToDictionary(x => x.Key, x => x.Value);
+
+          foreach (var f in input)
           {
-            if (keys.ContainsKey(f.Key))
+            try
             {
               if (int.TryParse(keys[f.Key], out var tId))
-              {
-                // var secC = Convert(cid);
-                // var secT = Convert(tId);
-                // var secF = Convert((int)f.Value);
-
-                res.Append($"{Convert(cid)}{Convert(tId)}{Convert((int)f.Value)}\n");
-              }
+                Write(buffer, cid, tId, (int)f.Value);
               else
-              {
-                Console.WriteLine($"Cannot parse {f.Key} - {keys[f.Key]}");
-                lock (_lockErrorFile)
-                  File.AppendAllLines(errorFile + ".lst", new[] { f.Key }, Encoding.UTF8);
-              }
+                unks.Add(f.Key, (int)f.Value);
             }
-            else
+            catch (Exception ex)
             {
-              Console.WriteLine($"{f.Key} not found in dict.");
-              lock (_lockErrorFile)
-                File.AppendAllLines(errorFile + ".lst", new[] { f.Key }, Encoding.UTF8);
+              File.AppendAllLines(pathErr, new[] { ex.Message, ex.StackTrace, "" }, Encoding.UTF8);
             }
           }
-          catch (Exception ex)
-          {
-            lock (_lockErrorFile)
-              File.AppendAllLines(errorFile, new[] { ex.Message, ex.StackTrace, "" }, Encoding.UTF8);
-          }
+
+          sum = input.Sum(x => x.Value);
+
+          if (unks.Count > 0)
+            lock (_idxLock)
+            {
+              var word2index = new Dictionary<string, string>();
+              var index2word = new Dictionary<string, string>();
+
+              foreach (var x in unks)
+              {
+                var tId = _idx;
+                word2index.Add(x.Key, tId.ToString());
+                index2word.Add(tId.ToString(), x.Key);
+
+                Write(buffer, cid, tId, x.Value);
+
+                _idx++;
+              }
+
+              w2i.PutBatch(word2index);
+              i2w.PutBatch(index2word);
+
+              File.WriteAllText(_idxPath, _idx.ToString());
+            }
         }
-      }
 
-      lock (_lockOutputFile)
-        File.AppendAllText(outputFile, res.ToString(), Encoding.ASCII);
+      File.WriteAllText(pathSum, sum.ToString(), Encoding.ASCII);
 
-      File.WriteAllText(outC, corpus.CountToken.ToString(), Encoding.ASCII);
-
-      Console.WriteLine($"{label}... [len: {res.Length}]...ok!");
+      Console.WriteLine($"{name}... [len: {sum}]...ok!");
     }
 
-    private static string Convert(int val)
-      => string.Join("", BitConverter.GetBytes(val).Select(System.Convert.ToChar));
+    private static void Write(Stream writer, int cid, int tid, int freq)
+    {
+      var buffer = Combine(BitConverter.GetBytes(cid),
+                           BitConverter.GetBytes(tid),
+                           BitConverter.GetBytes(freq),
+                           _eol);
+
+      writer.Write(buffer, 0, buffer.Length);
+    }
+
+    private static byte[] Combine(params byte[][] arrays)
+    {
+      var res = new byte[arrays.Sum(a => a.Length)];
+      var offset = 0;
+      foreach (var array in arrays)
+      {
+        Buffer.BlockCopy(array, 0, res, offset, array.Length);
+        offset += array.Length;
+      }
+      return res;
+    }
 
     private static ConfigModel LoadConfig(string path)
     {
