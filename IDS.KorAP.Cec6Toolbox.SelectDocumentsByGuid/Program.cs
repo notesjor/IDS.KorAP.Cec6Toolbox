@@ -42,12 +42,17 @@ namespace IDS.KorAP.Cec6Toolbox.SelectDocumentsByGuid
                       where queries.Contains(m)
                       select m).ToArray();
 
+        Console.WriteLine($"{cec6}... found: {select.Length} docs");
+
         if (select.Length > 0)
         {
           foreach (var dsel in select)
           {
             var text = corpus.GetReadableDocument(dsel, "Wort").ReduceDocumentToText();
             var sigle = corpus.GetDocumentMetadata(dsel, "Sigle", "").Replace("/", "_");
+            if (sigle == "")
+              sigle = $"{dsel:N}";
+
             File.WriteAllText(Path.Combine(dir, $"{sigle}.txt"), text, Encoding.UTF8);
           }
 
