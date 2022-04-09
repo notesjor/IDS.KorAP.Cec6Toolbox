@@ -19,7 +19,7 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
 
     static void Main(string[] args)
     {
-      if (args == null || args.Length < 8)
+      if (args == null || args.Length < 7)
       {
         PrintHelp();
         return;
@@ -27,20 +27,19 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
 
       var layer = args[0]; // Layer (alle Korpora müssen diesen Layer beinahlten)
       var query = args[1]; // Token für das die Kontext-Äquivalenz hergestellt werden soll
-      var cSize = int.Parse(args[2]); // Größe des Kontext (gemeinsamer Pool)
-      var min = double.Parse(args[3]); // Minimale Anpassung (wenn unterschritten > Abbruch)
-      var max = int.Parse(args[4]); // Maximale Anzahl an Runden (wenn überschritten > Abbruch)
-      var log = args[5]; // Ausgabedatei
-      
+      var min = double.Parse(args[2]); // Minimale Anpassung (wenn unterschritten > Abbruch)
+      var max = int.Parse(args[3]); // Maximale Anzahl an Runden (wenn überschritten > Abbruch)
+      var log = args[4]; // Ausgabedatei
+
       // Initialisiere den CorpusExplorer
       var project = CorpusExplorerEcosystem.InitializeMinimal(new CacheStrategyDisableCaching());
       Configuration.MinimumFrequency = 10;
       Configuration.MinimumSignificance = 1.0;
 
       var files = new List<string>(args);
-      files.RemoveRange(0, 6); // zwei oder mehr Korpora
+      files.RemoveRange(0, 5); // zwei oder mehr Korpora
 
-      PrintInfo(files, layer, query, cSize, min, max, log);
+      PrintInfo(files, layer, query, min, max, log);
 
       var corpora = files.Select(x => CorpusAdapterWriteDirect.Create(x)).ToArray();
       foreach (var c in corpora)
@@ -52,12 +51,9 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
       for (var i = 0; i < ratios.Length; i++)
         ratios[i] = 1.0;
 
-      // Target bestimmt wieviele Kookkurrenzen erwartet werden.
-      // Bsp.: cSize - 100 TOP-Kookkurrenzen - 4 Korpora = 25 Target (damit jedes Korpus gleich vertreten ist)
-      var target = cSize / files.Count;
-
       // Berechne einmalig für ein Korpus die Kookkurrenzen zum Suchwort
-      var parts = GetSelectionsCooccurrences(corpora.Select(x=>x.ToSelection()).ToArray(), layer, query);
+      var parts = GetSelectionsCooccurrences(corpora.Select(x => x.ToSelection()).ToArray(), layer, query);
+      var targets = parts.Select(x => x.Count).ToArray();
 
       for (var i = 1; i <= max; i++)
       {
@@ -67,36 +63,39 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
           selections[j] = SampleCorpus(corpora[j], ratios[j]);
 
         // Mische alle zufällig ausgewählten Texte zusammen und berechne die Kookkurrenzen zum Suchwort
-        var top = GetTopCooccurrences(project.SelectAll.CreateTemporary(MergeSelections(selections)), layer, query, cSize);
+        var top = GetTopCooccurrences(project.SelectAll.CreateTemporary(MergeSelections(selections)), layer, query);
         // Berechne wiviele von den Korpus-Kookkurrenzen in der Mischung unter den TOP-Kookkurrenzen vorkommen.
         var matches = GetMatches(top, parts);
         // Berechne eine neue Ratio
-        var ratiosNew = Resolve(matches, target);
+        var ratiosNew = Resolve(matches, targets);
 
         LogResults(log, i, max, files, ratios, matches, ratiosNew);
 
-        // Abbruch wenn Schwelle unterschritten
+        // Abbruch, wenn Schwelle unterschritten
         if (CalcChangeDiff(ratios, ratiosNew) < min)
+          break;
+        // Abbruch, wenn ein Korpus überhaupt nicht mehr gebraucht wird.
+        if(ratiosNew.Any(x=> x == 0))
           break;
 
         ratios = ratiosNew;
       }
     }
 
-    private static void PrintInfo(List<string> files, string layer, string query, int cSize, double min, int max, string log)
+    private static void PrintInfo(List<string> files, string layer, string query, double min, int max, string log)
     {
       Console.WriteLine("ContextEquivalenceSampler - (c) 2022 by Jan Oliver Rüdiger");
       Console.WriteLine($"{files.Count} files - Layer: {layer} - Query: {query}");
-      Console.WriteLine($"Context size: {cSize} - min. change: {min} - max. rounds: {max}");
+      Console.WriteLine($"min. change: {min} - max. rounds: {max}");
       Console.WriteLine($"output: {log}");
     }
 
-    private static double CalcChangeDiff(double[] ratios, double[] ratiosNew) 
+    private static double CalcChangeDiff(double[] ratios, double[] ratiosNew)
       => ratios.Select((t, i) => Math.Abs(t - ratiosNew[i])).Sum();
 
     private static void LogResults(string log, int i, int max, List<string> files, double[] ratios, int[] matches, double[] ratiosNew)
     {
-      if(!File.Exists(log))
+      if (!File.Exists(log))
         LogHeader(log, i, max, files, ratios, matches, ratiosNew);
 
       var stb = new List<string>();
@@ -129,18 +128,19 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
       File.AppendAllText(log, string.Join("\t", stb) + "\r\n", Encoding.UTF8);
     }
 
-    private static double[] Resolve(int[] matches, int target)
+    private static double[] Resolve(int[] matches, int[] targets)
     {
       var diff = new List<double>();
-      foreach (var x in matches)
+      for (var i = 0; i < matches.Length; i++)
       {
+        var x = matches[i];
         if (x == 0)
         {
           diff.Add(1);
           continue;
         }
 
-        var val = 1.0 + (target - (double)x)/target;
+        var val = 1.0 + (targets[i] - (double)x) / targets[i];
         diff.Add(val);
       }
 
@@ -156,10 +156,8 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
       return res;
     }
 
-    private static string[] GetTopCooccurrences(Selection all, string layer, string query, int cSize) =>
-      GetCooccurrences(layer, query, all).OrderByDescending(x => x.Value)
-                                         .Take(cSize)
-                                         .Select(x=>x.Key)
+    private static string[] GetTopCooccurrences(Selection all, string layer, string query) =>
+      GetCooccurrences(layer, query, all).Select(x => x.Key)
                                          .ToArray();
 
     private static IEnumerable<Guid> MergeSelections(Selection[] selections)
@@ -227,7 +225,7 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
 
     private static void PrintHelp()
     {
-      Console.WriteLine("./ces \"Lemma (tree_tagger)\" \"Haus\" 90 0.1 10 output.log corpus1.cec6 corpus2.cec6 corpus3.cec6");
+      Console.WriteLine("./ces \"Lemma (tree_tagger)\" \"Haus\" 0.1 10 output.log corpus1.cec6 corpus2.cec6 corpus3.cec6");
     }
 
     private static int[] GetRandomIndices(int count, int max)
