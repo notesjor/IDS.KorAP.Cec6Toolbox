@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler": {
+      "commandName": "Project",
+      "commandLineArgs": "\"Lemma\" \"Dank\" 16 0,1 10 output.log corpora/1.cec6 corpora/2.cec6"
+    }
+  }
+}
