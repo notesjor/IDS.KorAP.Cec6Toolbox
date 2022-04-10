@@ -52,8 +52,11 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
         ratios[i] = 1.0;
 
       // Berechne einmalig für ein Korpus die Kookkurrenzen zum Suchwort
-      var parts = GetSelectionsCooccurrences(corpora.Select(x => x.ToSelection()).ToArray(), layer, query);
+      var parts = GetCorpusCooccurrences(corpora.Select(x => x.ToSelection()).ToArray(), layer, query);
       var targets = parts.Select(x => x.Count).ToArray();
+
+      var success = false;
+      Selection sample = null;
 
       for (var i = 1; i <= max; i++)
       {
@@ -62,10 +65,13 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
           // Zufällige Auswahl an Texten im Verhältnis Korpusgröße (in Token) * Ratio (z. B. 0.75)
           selections[j] = SampleCorpus(corpora[j], ratios[j]);
 
-        // Mische alle zufällig ausgewählten Texte zusammen und berechne die Kookkurrenzen zum Suchwort
-        var top = GetTopCooccurrences(project.SelectAll.CreateTemporary(MergeSelections(selections)), layer, query);
+        // Mische alle zufällig ausgewählten Texte zusammen
+        sample = project.SelectAll.CreateTemporary(MergeSelections(selections));
+
+        // Berechne die Kookkurrenzen zum Suchwort im sample
+        var cooccurrences = GetMergedSampelCooccurrences(sample, layer, query);
         // Berechne wiviele von den Korpus-Kookkurrenzen in der Mischung unter den TOP-Kookkurrenzen vorkommen.
-        var matches = GetMatches(top, parts);
+        var matches = GetMatches(cooccurrences, parts);
         // Berechne eine neue Ratio
         var ratiosNew = Resolve(matches, targets);
 
@@ -73,24 +79,23 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
 
         // Abbruch, wenn Schwelle unterschritten
         // Abbruch, wenn ein Korpus überhaupt nicht mehr gebraucht wird.
-        if ((CalcChangeDiff(ratios, ratiosNew) < min) || (ratiosNew.Any(x => x == 0)))
+        if (CalcChangeDiff(matches, targets) < min || ratiosNew.Any(x => x == 0) || ratiosNew.All(x => (int)x == 1))
         {
-          Save(files, query, selections);
+          success = true;
+          Save(query, log, sample);
           break;
         }
 
         ratios = ratiosNew;
       }
+
+      if(!success)
+        Save(query, log, sample);
     }
 
-    private static void Save(List<string> files, string query, Selection[] selections)
+    private static void Save(string query, string log, Selection sample)
     {
-      for (var i = 0; i < files.Count; i++)
-      {
-        var file = files[i];
-        var path = Path.Combine(Path.GetDirectoryName(file), $"CES_{query}_{Path.GetFileName(file)}");
-        selections[i].ToCorpus().Save(path);
-      }
+      sample.ToCorpus().Save($"{log.Replace(".log", "")}_{query}.cec6.lz4");
     }
 
     private static void PrintInfo(List<string> files, string layer, string query, double min, int max, string log)
@@ -101,8 +106,8 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
       Console.WriteLine($"output: {log}");
     }
 
-    private static double CalcChangeDiff(double[] ratios, double[] ratiosNew)
-      => ratios.Select((t, i) => Math.Abs(t - ratiosNew[i])).Sum();
+    private static double CalcChangeDiff(int[] matches, int[] targets)
+      => matches.Select((m, i) => Math.Abs(m / (double)targets[i])).Sum();
 
     private static void LogResults(string log, int i, int max, List<string> files, double[] ratios, int[] matches,
                                    int[] targets, double[] ratiosNew)
@@ -164,15 +169,15 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
       return diff.Select(x => x / max).ToArray();
     }
 
-    private static int[] GetMatches(string[] top, HashSet<string>[] parts)
+    private static int[] GetMatches(string[] cooccurrences, HashSet<string>[] parts)
     {
       var res = new int[parts.Length];
       for (var i = 0; i < parts.Length; i++)
-        res[i] = top.Count(x => parts[i].Contains(x));
+        res[i] = cooccurrences.Count(x => parts[i].Contains(x));
       return res;
     }
 
-    private static string[] GetTopCooccurrences(Selection all, string layer, string query) =>
+    private static string[] GetMergedSampelCooccurrences(Selection all, string layer, string query) =>
       GetCooccurrences(layer, query, all).Select(x => x.Key)
                                          .ToArray();
 
@@ -184,7 +189,7 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
       return res;
     }
 
-    private static HashSet<string>[] GetSelectionsCooccurrences(Selection[] selections, string layer, string query)
+    private static HashSet<string>[] GetCorpusCooccurrences(Selection[] selections, string layer, string query)
     {
       var res = new HashSet<string>[selections.Length];
       for (var i = 0; i < selections.Length; i++)
