@@ -69,16 +69,27 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
         // Berechne eine neue Ratio
         var ratiosNew = Resolve(matches, targets);
 
-        LogResults(log, i, max, files, ratios, matches, ratiosNew);
+        LogResults(log, i, max, files, ratios, matches, targets, ratiosNew);
 
         // Abbruch, wenn Schwelle unterschritten
-        if (CalcChangeDiff(ratios, ratiosNew) < min)
-          break;
         // Abbruch, wenn ein Korpus überhaupt nicht mehr gebraucht wird.
-        if(ratiosNew.Any(x=> x == 0))
+        if ((CalcChangeDiff(ratios, ratiosNew) < min) || (ratiosNew.Any(x => x == 0)))
+        {
+          Save(files, query, selections);
           break;
+        }
 
         ratios = ratiosNew;
+      }
+    }
+
+    private static void Save(List<string> files, string query, Selection[] selections)
+    {
+      for (var i = 0; i < files.Count; i++)
+      {
+        var file = files[i];
+        var path = Path.Combine(Path.GetDirectoryName(file), $"CES_{query}_{Path.GetFileName(file)}");
+        selections[i].ToCorpus().Save(path);
       }
     }
 
@@ -93,10 +104,11 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
     private static double CalcChangeDiff(double[] ratios, double[] ratiosNew)
       => ratios.Select((t, i) => Math.Abs(t - ratiosNew[i])).Sum();
 
-    private static void LogResults(string log, int i, int max, List<string> files, double[] ratios, int[] matches, double[] ratiosNew)
+    private static void LogResults(string log, int i, int max, List<string> files, double[] ratios, int[] matches,
+                                   int[] targets, double[] ratiosNew)
     {
       if (!File.Exists(log))
-        LogHeader(log, i, max, files, ratios, matches, ratiosNew);
+        LogHeader(log, files);
 
       var stb = new List<string>();
       stb.Add(i.ToString());
@@ -106,13 +118,15 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
         stb.Add(Path.GetFileNameWithoutExtension(files[j]));
         stb.Add(ratios[j].ToString());
         stb.Add(matches[j].ToString());
+        stb.Add(targets[j].ToString());
+        stb.Add((matches[j] / (double)targets[j] * 100.0).ToString());
         stb.Add(ratiosNew[j].ToString());
       }
 
       File.AppendAllText(log, string.Join("\t", stb) + "\r\n", Encoding.UTF8);
     }
 
-    private static void LogHeader(string log, int i, int max, List<string> files, double[] ratios, int[] matches, double[] ratiosNew)
+    private static void LogHeader(string log, List<string> files)
     {
       var stb = new List<string>();
       stb.Add("ROUND");
@@ -122,6 +136,8 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
         stb.Add($"FILE ({j})");
         stb.Add($"RATIO - PRE ({j})");
         stb.Add($"MATCHES ({j})");
+        stb.Add($"TARGET ({j})");
+        stb.Add($"MATCHES% ({j})");
         stb.Add($"RATIO - POST ({j})");
       }
 
