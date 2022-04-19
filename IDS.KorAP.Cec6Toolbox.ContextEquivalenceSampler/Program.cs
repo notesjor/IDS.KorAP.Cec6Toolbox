@@ -56,21 +56,21 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
       var targets = parts.Select(x => x.Count).ToArray();
 
       var success = false;
-      Selection sample = null;
+      Selection all = null;
+      var samples = new Selection[corpora.Length];
 
       for (var i = 1; i <= max; i++)
       {
-        var selections = new Selection[corpora.Length];
         for (var j = 0; j < corpora.Length; j++)
           // Zufällige Auswahl an Texten im Verhältnis Korpusgröße (in Token) * Ratio (z. B. 0.75)
-          selections[j] = SampleCorpus(corpora[j], ratios[j]);
+          samples[j] = SampleCorpus(corpora[j], ratios[j]);
 
         // Mische alle zufällig ausgewählten Texte zusammen
-        sample = project.SelectAll.CreateTemporary(MergeSelections(selections));
+        all = project.SelectAll.CreateTemporary(MergeSelections(samples));
 
-        // Berechne die Kookkurrenzen zum Suchwort im sample
-        var cooccurrences = GetMergedSampelCooccurrences(sample, layer, query);
-        // Berechne wiviele von den Korpus-Kookkurrenzen in der Mischung unter den TOP-Kookkurrenzen vorkommen.
+        // Berechne, die Kookkurrenzen zum Suchwort im sample
+        var cooccurrences = GetMergedSampelCooccurrences(all, layer, query);
+        // Zähle, pro Korpus wieviele Kookkurrenzen mit den Gesamt-Kookkurrenzen übereinstimmen
         var matches = GetMatches(cooccurrences, parts);
         // Berechne eine neue Ratio
         var ratiosNew = Resolve(matches, targets);
@@ -82,7 +82,7 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
         if (CalcChangeDiff(matches, targets) < min || ratiosNew.Any(x => x == 0) || ratiosNew.All(x => (int)x == 1))
         {
           success = true;
-          Save(query, log, sample);
+          Save(query, log, all, samples);
           break;
         }
 
@@ -90,12 +90,14 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
       }
 
       if(!success)
-        Save(query, log, sample);
+        Save(query, log, all, samples);
     }
 
-    private static void Save(string query, string log, Selection sample)
+    private static void Save(string query, string log, Selection all, Selection[] samples)
     {
-      sample.ToCorpus().Save($"{log.Replace(".log", "")}_{query}.cec6.lz4");
+      all.ToCorpus().Save($"{log.Replace(".log", "")}_{query}.cec6.lz4");
+      foreach (var x in samples)
+        x.ToCorpus().Save($"{log.Replace(".log", "")}_{x.Displayname}.cec6.lz4");
     }
 
     private static void PrintInfo(List<string> files, string layer, string query, double min, int max, string log)
@@ -155,25 +157,25 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
 
     private static double[] Resolve(int[] matches, int[] targets)
     {
-      var diff = new List<double>();
-      for (var i = 0; i < matches.Length; i++)
-      {
-        var x = matches[i];
-        if (x == 0)
-        {
-          diff.Add(1);
-          continue;
-        }
+      var factor = new double[matches.Length];
+      // Berechne prozentualen Anteil an übereinstimmenden Kookkurrenzen
+      for (var i = 0; i < factor.Length; i++)
+        factor[i] = matches[i] <= 0 ? 1.0 : matches[i] / (double)targets[i];
 
-        var val = 1.0 + (targets[i] - (double)x) / targets[i];
-        diff.Add(val);
-      }
+      // Ermittele niedrigsten Übereinstimmungswert
+      var min = factor.Min();
 
-      var max = diff.Select(Math.Abs).Max();
-      diff = diff.Select(x => x / max).ToList();
+      // Bsp.
+      /*
+       * K1 = 15% | K2 = 5% | K3 = 2%
+       * K3 > geringste Übereinstimmung
+       * K1 = 15% / 2% = 7,5 | K2 = 5% / 2% = 2,5 | K3 = 2% / 2% = 1
+       * F1 = 1 / 7,5 = 0.13 | K2 = 1 / 2,5 = 0,4 | K3 = 1 / 1 = 1
+       */
+      for (var i = 0; i < factor.Length; i++)
+        factor[i] = 1.0 / (factor[i] / min);
 
-      var avg = diff.Sum() / diff.Count;
-      return diff.Select(x => Math.Abs(avg - x)).ToArray();
+      return factor;
     }
 
     private static int[] GetMatches(string[] cooccurrences, HashSet<string>[] parts)
@@ -248,7 +250,10 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
           break;
       }
 
-      return cec6.ToSelection().CreateTemporary(output);
+      var res = cec6.ToSelection().CreateTemporary(output);
+      res.Displayname = cec6.CorpusDisplayname;
+
+      return res;
     }
 
     private static void PrintHelp()
