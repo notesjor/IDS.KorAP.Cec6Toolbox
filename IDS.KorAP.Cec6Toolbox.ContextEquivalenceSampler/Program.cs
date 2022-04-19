@@ -107,7 +107,11 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
     }
 
     private static double CalcChangeDiff(int[] matches, int[] targets)
-      => matches.Select((m, i) => Math.Abs(m / (double)targets[i])).Sum();
+    {
+      var diff = matches.Select((m, i) => Math.Abs(((double)targets[i] - m) / targets[i])).ToArray();
+      var avg = diff.Sum() / matches.Length;
+      return diff.Select(x => Math.Abs(avg - x)).Sum();
+    }
 
     private static void LogResults(string log, int i, int max, List<string> files, double[] ratios, int[] matches,
                                    int[] targets, double[] ratiosNew)
@@ -166,7 +170,10 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
       }
 
       var max = diff.Select(Math.Abs).Max();
-      return diff.Select(x => x / max).ToArray();
+      diff = diff.Select(x => x / max).ToList();
+
+      var avg = diff.Sum() / diff.Count;
+      return diff.Select(x => Math.Abs(avg - x)).ToArray();
     }
 
     private static int[] GetMatches(string[] cooccurrences, HashSet<string>[] parts)
