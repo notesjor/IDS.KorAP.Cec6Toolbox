@@ -79,7 +79,7 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
 
         // Abbruch, wenn Schwelle unterschritten
         // Abbruch, wenn ein Korpus überhaupt nicht mehr gebraucht wird.
-        if (CalcChangeDiff(matches, targets) < min || ratiosNew.Any(x => x == 0) || ratiosNew.All(x => (int)x == 1))
+        if (CalcChangeDiff(ratios, ratiosNew) < min || ratiosNew.Any(x => x == 0) || ratiosNew.All(x => (int)x == 1))
         {
           success = true;
           Save(query, log, all, samples);
@@ -108,8 +108,7 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
       Console.WriteLine($"output: {log}");
     }
 
-    private static double CalcChangeDiff(int[] matches, int[] targets) 
-      => matches.Select((t, i) => 1.0 - (t <= 0 ? 0.001 : t / (double)targets[i])).Prepend(0.0).Max();
+    private static double CalcChangeDiff(double[] r, double[] n) => r.Select((t, i) => Math.Abs(t - n[i])).Max();
 
     private static void LogResults(string log, int i, int max, List<string> files, double[] ratios, int[] matches,
                                    int[] targets, double[] ratiosNew)
