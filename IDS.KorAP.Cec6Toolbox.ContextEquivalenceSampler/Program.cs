@@ -50,11 +50,7 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
       var ratios = new double[files.Count];
       for (var i = 0; i < ratios.Length; i++)
         ratios[i] = 1.0;
-
-      // Berechne einmalig für ein Korpus die Kookkurrenzen zum Suchwort
-      var parts = GetCorpusCooccurrences(corpora.Select(x => x.ToSelection()).ToArray(), layer, query);
-      var targets = parts.Select(x => x.Count).ToArray();
-
+      
       var success = false;
       Selection all = null;
       var samples = new Selection[corpora.Length];
@@ -64,6 +60,10 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
         for (var j = 0; j < corpora.Length; j++)
           // Zufällige Auswahl an Texten im Verhältnis Korpusgröße (in Token) * Ratio (z. B. 0.75)
           samples[j] = SampleCorpus(corpora[j], ratios[j]);
+        
+        // Berechne einmalig für ein Korpus die Kookkurrenzen zum Suchwort
+        var parts = GetCorpusCooccurrences(samples, layer, query);
+        var targets = parts.Select(x => x.Count).ToArray();
 
         // Mische alle zufällig ausgewählten Texte zusammen
         all = project.SelectAll.CreateTemporary(MergeSelections(samples));
