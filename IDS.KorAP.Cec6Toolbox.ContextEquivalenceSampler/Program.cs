@@ -73,7 +73,7 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
         // Zähle, pro Korpus wieviele Kookkurrenzen mit den Gesamt-Kookkurrenzen übereinstimmen
         var matches = GetMatches(cooccurrences, parts);
         // Berechne eine neue Ratio
-        var ratiosNew = Resolve(matches, targets);
+        var ratiosNew = Resolve(matches, targets, min, ratios);
 
         LogResults(log, i, max, files, ratios, matches, targets, ratiosNew);
 
@@ -108,12 +108,8 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
       Console.WriteLine($"output: {log}");
     }
 
-    private static double CalcChangeDiff(int[] matches, int[] targets)
-    {
-      var diff = matches.Select((m, i) => Math.Abs(((double)targets[i] - m) / targets[i])).ToArray();
-      var avg = diff.Sum() / matches.Length;
-      return diff.Select(x => Math.Abs(avg - x)).Sum();
-    }
+    private static double CalcChangeDiff(int[] matches, int[] targets) 
+      => matches.Select((t, i) => 1.0 - (t <= 0 ? 0.001 : t / (double)targets[i])).Prepend(0.0).Max();
 
     private static void LogResults(string log, int i, int max, List<string> files, double[] ratios, int[] matches,
                                    int[] targets, double[] ratiosNew)
@@ -155,25 +151,26 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
       File.AppendAllText(log, string.Join("\t", stb) + "\r\n", Encoding.UTF8);
     }
 
-    private static double[] Resolve(int[] matches, int[] targets)
+    private static double[] Resolve(int[] matches, int[] targets, double min, double[] ratios)
     {
       var factor = new double[matches.Length];
-      // Berechne prozentualen Anteil an übereinstimmenden Kookkurrenzen
       for (var i = 0; i < factor.Length; i++)
-        factor[i] = matches[i] <= 0 ? 1.0 : matches[i] / (double)targets[i];
+      {
+        factor[i] = matches[i] <= 0 ? 0.001 : matches[i] / (double)targets[i];
 
-      // Ermittele niedrigsten Übereinstimmungswert
-      var min = factor.Min();
+        if (1.0 - factor[i] < min) // Wenn Abstand kleiner min, dann übernehme alten Wert
+          factor[i] = ratios[i];
+        else
+          factor[i] = ratios[i] + (1.0 - factor[i]);
+      }
 
-      // Bsp.
-      /*
-       * K1 = 15% | K2 = 5% | K3 = 2%
-       * K3 > geringste Übereinstimmung
-       * K1 = 15% / 2% = 7,5 | K2 = 5% / 2% = 2,5 | K3 = 2% / 2% = 1
-       * F1 = 1 / 7,5 = 0.13 | K2 = 1 / 2,5 = 0,4 | K3 = 1 / 1 = 1
-       */
-      for (var i = 0; i < factor.Length; i++)
-        factor[i] = 1.0 / (factor[i] / min);
+      // ReSharper disable once InvertIf
+      if (factor.Any(x => x > 1.0))
+      {
+        var max = factor.Max() + min;
+        for (var i = 0; i < factor.Length; i++)
+          factor[i] /= max;
+      }
 
       return factor;
     }
