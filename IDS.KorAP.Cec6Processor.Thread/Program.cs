@@ -35,7 +35,7 @@ namespace IDS.KorAP.Cec6Processor.Thread
           c.Dispose();
 
         if (debug && importer.DebugLog.Any())
-          File.WriteAllLines(Path.Combine(dir, Path.GetFileName(args[1])), importer.DebugLog.Select(x => $"{x.Message}\r\n{x.StackTrace}\r\n---\r\n"), Encoding.UTF8);
+          File.AppendAllLines(Path.Combine(dir, Path.GetFileName(args[1])), importer.DebugLog.Select(x => $"{x.Message}\r\n{x.StackTrace}\r\n---\r\n"), Encoding.UTF8);
 
         importer.Dispose();
       }
@@ -43,13 +43,21 @@ namespace IDS.KorAP.Cec6Processor.Thread
       {
         try
         {
-          File.WriteAllText(Path.Combine(dir, Path.GetFileName(args[1])), $"###MASSIVER FEHLER###\r\n{ex.Message}\r\n---\r\n{ex.StackTrace}\r\n###");
+          File.AppendAllText(Path.Combine(dir, Path.GetFileName(args[1])), "###MASSIVER FEHLER######");
+          RecursiveWriteExecptionLog(dir, Path.GetFileName(args[1]), ex);
         }
         catch
         {
           // ignore
         }
       }
+    }
+
+    private static void RecursiveWriteExecptionLog(string dir, string fn, Exception ex)
+    {
+      File.AppendAllText(Path.Combine(dir, fn), $"\r\n{ex.Message}\r\n---\r\n{ex.StackTrace}\r\n");
+      if(ex.InnerException != null)
+        RecursiveWriteExecptionLog(dir, fn, ex.InnerException);
     }
   }
 }
