@@ -21,7 +21,6 @@ namespace IDS.KorAP.Cec6Processor.Thread
       {
         var importer = new ImporterKorap
         {
-          Strategy = args[0].EndsWith(".zip") ? new LoadStrategyMemory() : new LoadStrategyExtractedDirectory(), 
           Debug = debug,
           ImportCoreNlp = false,
           ImportMalt = false,
