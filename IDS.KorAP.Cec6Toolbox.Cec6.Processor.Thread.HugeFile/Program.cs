@@ -1,8 +1,7 @@
 ﻿using System.Diagnostics;
-using CorpusExplorer.Sdk.Extern.Xml.Ids.KorAP;
 using CorpusExplorer.Sdk.Helper;
 
-namespace IDS.KorAP.Cec6Toolbox.Cec6.Processor.Thread.HugeFile
+namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
 {
   internal class Program
   {
@@ -47,7 +46,15 @@ namespace IDS.KorAP.Cec6Toolbox.Cec6.Processor.Thread.HugeFile
 
     private static void SubProcess(string path, string head, string list, string output)
     {
-      var importer = new ImporterKorapStream(Serializer.Deserialize<Dictionary<string, object>>(head), list);
+      var importer = new ImporterKorapStream(Serializer.Deserialize<Dictionary<string, object>>(head), list)
+      {
+        ImportCoreNlp = ImportCoreNlp,
+        ImportMalt = ImportMalt,
+        ImportMarmot = ImportMarmot,
+        ImportOpenNlp = ImportOpenNlp,
+        ImportTreeTagger = ImportTreeTagger,
+        ReadTaxonomy = false
+      };
       importer.Execute(new[] { path }).FirstOrDefault()?.Save(output);
     }
   }

@@ -1,19 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-using System.Xml;
+﻿using System.Xml;
 using CorpusExplorer.Sdk.Ecosystem.Model;
 using CorpusExplorer.Sdk.Extern.Xml.Helper;
 using CorpusExplorer.Sdk.Extern.Xml.Ids.Exceptions;
+using CorpusExplorer.Sdk.Extern.Xml.Ids.KorAP;
 using CorpusExplorer.Sdk.Extern.Xml.Ids.KorAP.LoadStrategy;
 using CorpusExplorer.Sdk.Helper;
 using CorpusExplorer.Sdk.Model.Adapter.Corpus;
 using CorpusExplorer.Sdk.Utils.CorpusManipulation;
 using CorpusExplorer.Sdk.Utils.DocumentProcessing.Importer.Abstract;
 
-namespace CorpusExplorer.Sdk.Extern.Xml.Ids.KorAP
+namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
 {
   public class ImporterKorapStream : AbstractImporterBase
   {

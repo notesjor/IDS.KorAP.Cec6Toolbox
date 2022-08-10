@@ -1,13 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
+﻿using System.Text.RegularExpressions;
 using CorpusExplorer.Sdk.Extern.Xml.Ids.KorAP;
 using CorpusExplorer.Sdk.Extern.Xml.Ids.KorAP.LoadStrategy;
 
-namespace IDS.KorAP.Cec6Toolbox.Cec6.Processor.Thread.HugeFile
+namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
 {
   public static class ClusterBuilder
   {
