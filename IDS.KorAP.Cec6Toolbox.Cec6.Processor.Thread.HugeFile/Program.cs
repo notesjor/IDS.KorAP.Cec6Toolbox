@@ -36,9 +36,9 @@ namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
           var session = new TemporaryFile(dir.Path);
           File.WriteAllLines(session.Path, cluster);
 
-          var output = new TemporaryFile(dir.Path, ".cec6.lz4");
+          var output = Path.Combine($"/home/ruediger/CEC6/{Path.GetFileNameWithoutExtension(path)}.cec6.lz4");
 
-          var process = Process.Start("/home/ruediger/TOOLBOX/PROCESSOR/IDS.KorAP.Cec6Processor.Thread.HugeFile", new[] { path, headFile.Path, session.Path, output.Path });
+          var process = Process.Start("/home/ruediger/TOOLBOX/PROCESSOR/IDS.KorAP.Cec6Processor.Thread.HugeFile", new[] { path, headFile.Path, session.Path, output });
           process.WaitForExit();
         });
       }
