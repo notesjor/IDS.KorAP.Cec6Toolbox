@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.IO.Compression;
+using System.Text;
 using Ionic.Zip;
 
 namespace IDS.KorAP.Cec6Toolbox.ZipFixer
@@ -9,37 +10,72 @@ namespace IDS.KorAP.Cec6Toolbox.ZipFixer
     {
       Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
-      foreach (var file in args)
+      if (!args[1].Contains("error-copycat"))
+        throw new ArgumentException("[INPUT] [error-copycat from Zip-Checker] [OUTPUT]");
+
+      var input = args[0];
+      var fixes = Directory.GetFiles(args[1]); // Erstellt mit ZipChecker (error-copycat)
+      var output = args[2];
+
+      foreach (var file in fixes)
       {
         try
         {
-          var nFile = file.Replace(".zip", ".new.zip");
-          var done = new HashSet<string>();
+          var block = GetBlockInfo(file);
+          var name = Path.GetFileName(file);
 
-          using (var input = new ZipInputStream(file))
-          using (var output = new ZipFile(nFile, Encoding.UTF8))
+          if (!File.Exists(Path.Combine(input, name)))
+            continue;
+
+          using (var inputStream = new ZipInputStream(Path.Combine(input, name)))
+            using (var fs = new FileStream(Path.Combine(output, name), FileMode.Create, FileAccess.Write))
+          using (var outputStream = new ZipArchive(fs, ZipArchiveMode.Create))
           {
-            var entry = input.GetNextEntry();
-            if (entry == null)
-              continue;
+            while (true)
+            {
+              var entryInput = inputStream.GetNextEntry();
+              if (entryInput == null)
+                break;
 
-            var key = entry.FileName;
-            var buffer = new byte[entry.UncompressedSize];
-            input.Read(buffer, 0, buffer.Length);
+              var key = entryInput.FileName;
 
-            if (done.Contains(key) && entry.UncompressedSize > 0)
-              output.UpdateEntry(key, buffer);
-            else
-              output.AddEntry(key, buffer);
+              // Block-Check
+              if (block.ContainsKey(key))
+              {
+                block[key]--;
+                if (block[key] < 1)
+                  block.Remove(key);
+                continue;
+              }
 
-            done.Add(key);
+              var buffer = new byte[entryInput.UncompressedSize];
+              inputStream.Read(buffer, 0, buffer.Length);
+
+              var entry = outputStream.CreateEntry(key, CompressionLevel.Fastest);
+              using(var tmp = entry.Open())
+                tmp.Write(buffer, 0, buffer.Length);
+            }
           }
         }
         catch (Exception ex)
         {
-          // ignore
+          Console.WriteLine(ex.Message);
+          Console.WriteLine(ex.StackTrace);
         }
       }
+    }
+
+    private static Dictionary<string, int> GetBlockInfo(string file)
+    {
+      var lines = File.ReadAllLines(file);
+
+      var res = new Dictionary<string, int>();
+      foreach (var line in lines)
+        if (res.ContainsKey(line))
+          res[line]++;
+        else
+          res.Add(line, 1);
+      return res;
     }
   }
 }
