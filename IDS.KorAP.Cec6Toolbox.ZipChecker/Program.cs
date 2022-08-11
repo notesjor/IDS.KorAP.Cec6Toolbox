@@ -7,12 +7,14 @@ namespace IDS.KorAP.Cec6Toolbox.ZipChecker
     static void Main(string[] args)
     {
       var files = Directory.GetFiles(args[0], "*.zip", SearchOption.TopDirectoryOnly);
-      if (!Directory.Exists("output"))
-        Directory.CreateDirectory("output");
+      if (!Directory.Exists("error-copycat"))
+        Directory.CreateDirectory("error-copycat");
+      if (!Directory.Exists("error-zipfile"))
+        Directory.CreateDirectory("error-zipfile");
 
       Console.WriteLine($"{files.Length} ZIP-Files found...");
 
-      Parallel.ForEach(files, file =>
+      Parallel.ForEach(files, new ParallelOptions { MaxDegreeOfParallelism = 40 }, file =>
       {
         try
         {
@@ -24,25 +26,27 @@ namespace IDS.KorAP.Cec6Toolbox.ZipChecker
             CreateNoWindow = true,
             UseShellExecute = false,
             RedirectStandardOutput = true,
+            RedirectStandardError = true,
           });
 
-          var lines = process.StandardOutput.ReadToEnd().Split(new []{"\r\n", "\r", "\n"}, StringSplitOptions.RemoveEmptyEntries);
+          var entries = process.StandardOutput.ReadToEnd().Split(new []{"\r\n", "\r", "\n"}, StringSplitOptions.RemoveEmptyEntries);
+          var zipError = process.StandardError.ReadToEnd();
           process.WaitForExit();
 
           var known = new HashSet<string>();
           var error = new List<string>();
 
-          foreach (var line in lines)
+          foreach (var entry in entries)
           {
-            if (known.Contains(line))
-              error.Add(line);
-            known.Add(line);
+            if (known.Contains(entry))
+              error.Add(entry);
+            known.Add(entry);
           }
 
-          if (error.Count == 0)
-            return;
-
-          File.WriteAllLines(Path.Combine("output", Path.GetFileName(file)), error);
+          if (error.Count > 0)
+            File.WriteAllLines(Path.Combine("error-copycat", Path.GetFileName(file)), error);
+          if(!string.IsNullOrWhiteSpace(zipError))
+            File.WriteAllText(Path.Combine("error-zipfile", Path.GetFileName(file)), zipError);
         }
         catch (Exception ex)
         {
@@ -50,8 +54,6 @@ namespace IDS.KorAP.Cec6Toolbox.ZipChecker
           Console.WriteLine(ex.StackTrace);
         }
       });
-
-      Directory.Delete("tmp", true);
     }
   }
 }

@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "IDS.KorAP.Cec6Toolbox.ZipFixer": {
+      "commandName": "Project",
+      "commandLineArgs": "C:\\Users\\Jan\\Desktop\\1.zip"
+    }
+  }
+}
