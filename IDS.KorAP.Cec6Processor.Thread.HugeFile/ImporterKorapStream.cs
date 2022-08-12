@@ -4,9 +4,6 @@ using CorpusExplorer.Sdk.Extern.Xml.Helper;
 using CorpusExplorer.Sdk.Extern.Xml.Ids.Exceptions;
 using CorpusExplorer.Sdk.Extern.Xml.Ids.KorAP;
 using CorpusExplorer.Sdk.Extern.Xml.Ids.KorAP.LoadStrategy;
-using CorpusExplorer.Sdk.Helper;
-using CorpusExplorer.Sdk.Model.Adapter.Corpus;
-using CorpusExplorer.Sdk.Utils.CorpusManipulation;
 using CorpusExplorer.Sdk.Utils.DocumentProcessing.Importer.Abstract;
 
 namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
@@ -21,6 +18,7 @@ namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
     public bool ImportTreeTagger { get; set; } = true;
 
     public bool ReadTaxonomy { get; set; } = false;
+    public bool ReadLanguage { get; set; } = false;
 
     public bool Debug { get; set; } = false;
     
@@ -32,19 +30,6 @@ namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
     {
       _partition = File.ReadAllLines(listPath);
       _head = head;
-
-      ExcuteCorpusResultDelegate = () =>
-      {
-        var merger = new CorpusMerger();
-        foreach (var part in _parts)
-        {
-          merger.Input(CorpusAdapterWriteDirect.Create(part.Path));
-          part.Dispose();
-        }
-
-        merger.Execute();
-        return merger.Output;
-      };
     }
 
     protected override void ExecuteCall(string path)
@@ -55,11 +40,9 @@ namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
       ImportOpenNlp = ValidateFeature(ImportOpenNlp, path, "opennlp", out var opennlp);
       ImportTreeTagger = ValidateFeature(ImportTreeTagger, path, "tree_tagger", out var tree_tagger);
 
-      _parts = new List<TemporaryFile>();
-
       using (var zip = new KorapZip(path))
       {
-        var helper = new KorapScraper { ReadTaxonomy = ReadTaxonomy }; // Helper
+        var helper = new KorapScraper { ReadTaxonomy = ReadTaxonomy, ReadLanguage = ReadLanguage}; // Helper
 
         Parallel.ForEach(_partition, Configuration.ParallelOptions, textRoot =>
           {
@@ -98,11 +81,6 @@ namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
             }
           });
           // <-- siehe ImporterKorap <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <-- <--
-
-          var temp = new TemporaryFile(Configuration.TempPath, ".cec6.lz4");
-          _parts.Add(temp);
-
-          BuildCorpus(true).FirstOrDefault()?.Save(temp.Path);
       }
 
       corenlp?.Dispose();
@@ -262,7 +240,7 @@ namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
       skelOut = tmpSkel.ToArray();
     }
 
-    private static bool ValidateFeature(bool featureSwitch, string path, string feature, out KorapZip zip)
+    private bool ValidateFeature(bool featureSwitch, string path, string feature, out KorapZip zip)
     {
       if (!featureSwitch)
       {
@@ -272,7 +250,7 @@ namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
 
       try
       {
-        zip = new KorapZip(path, feature);
+        zip = new KorapZip(Path.Combine(Path.GetDirectoryName(path), $"{Path.GetFileNameWithoutExtension(path)}.{feature}.zip"));
         return true;
       }
       catch
@@ -481,7 +459,6 @@ namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
       {"lemma", "Lemma"}
     };
 
-    private List<TemporaryFile> _parts;
     private readonly string[] _partition;
 
     private static string FixLayerName(string name)

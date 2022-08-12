@@ -1,5 +1,8 @@
 ﻿using System.Diagnostics;
+using System.Runtime.Serialization.Formatters.Binary;
 using CorpusExplorer.Sdk.Helper;
+using CorpusExplorer.Sdk.Model.Adapter.Corpus;
+using CorpusExplorer.Sdk.Utils.CorpusManipulation;
 
 namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
 {
@@ -10,6 +13,7 @@ namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
     public static bool ImportMarmot { get; set; } = false;
     public static bool ImportOpenNlp { get; set; } = false;
     public static bool ImportTreeTagger { get; set; } = true;
+    public static int SIZE { get; set; } = 100000;
 
     static void Main(string[] args)
     {
@@ -21,32 +25,51 @@ namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
 
     private static void MainProcess(string path)
     {
-      ClusterBuilder.SIZE = 100000;
-      var clusters = ClusterBuilder.BuildCluster(path, out var header);
+      var clusters = GetClusters(path, out var header);
       if (clusters == null)
         return;
-      
+      GC.Collect();
+
       using (var dir = new TemporaryDirectory())
       {
-        var headFile = new TemporaryFile(dir.Path, ".head");
-        Serializer.Serialize(header, headFile.Path, false);
+        var head = Guid.NewGuid();
+        var headFile = Path.Combine(dir.Path, $"{head:N}.head");
+        Serialize(header, headFile);
+
+        var files = new List<string>();
 
         Parallel.ForEach(clusters, new ParallelOptions { MaxDegreeOfParallelism = 4 }, cluster =>
         {
-          var session = new TemporaryFile(dir.Path);
-          File.WriteAllLines(session.Path, cluster);
+          var session = Path.Combine(dir.Path, $"{Guid.NewGuid():N}.txt");
+          File.WriteAllLines(session, cluster);
 
-          var output = Path.Combine($"/home/ruediger/CEC6/{Path.GetFileNameWithoutExtension(path)}.cec6.lz4");
+          var output = Path.Combine(dir.Path, $"{Guid.NewGuid():N}.cec6.lz4");
+          files.Add(output);
 
-          var process = Process.Start("/home/ruediger/TOOLBOX/PROCESSOR/IDS.KorAP.Cec6Processor.Thread.HugeFile", new[] { path, headFile.Path, session.Path, output });
+          var process = Process.Start("/home/ruediger/TOOLBOX/PROCESSOR/IDS.KorAP.Cec6Processor.Thread.HugeFile", new[] { path, headFile, session, output });
           process.WaitForExit();
         });
+
+        var merger = new CorpusMerger();
+        foreach (var file in files)
+        {
+          merger.Input(CorpusAdapterWriteDirect.Create(file));
+        }
+
+        merger.Execute();
+        merger.Output.First().Save(Path.Combine($"/home/ruediger/CEC6/{Path.GetFileNameWithoutExtension(path)}.cec6.lz4"));
       }
+    }
+
+    private static string[][] GetClusters(string path, out Dictionary<string, object> header)
+    {
+      var builder = new ClusterBuilder(SIZE);
+      return builder.BuildCluster(path, out header);
     }
 
     private static void SubProcess(string path, string head, string list, string output)
     {
-      var importer = new ImporterKorapStream(Serializer.Deserialize<Dictionary<string, object>>(head), list)
+      var importer = new ImporterKorapStream(Deserialize(head), list)
       {
         ImportCoreNlp = ImportCoreNlp,
         ImportMalt = ImportMalt,
@@ -56,6 +79,24 @@ namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
         ReadTaxonomy = false
       };
       importer.Execute(new[] { path }).FirstOrDefault()?.Save(output);
+    }
+
+    private static void Serialize(Dictionary<string, object> data, string path)
+    {
+      using (var fs = new FileStream(path, FileMode.Create, FileAccess.Write))
+      {
+        var bf = new BinaryFormatter();
+        bf.Serialize(fs, data);
+      }
+    }
+
+    private static Dictionary<string, object> Deserialize(string path)
+    {
+      using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read))
+      {
+        var bf = new BinaryFormatter();
+        return bf.Deserialize(fs) as Dictionary<string, object>;
+      }
     }
   }
 }

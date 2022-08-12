@@ -4,11 +4,16 @@ using CorpusExplorer.Sdk.Extern.Xml.Ids.KorAP.LoadStrategy;
 
 namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
 {
-  public static class ClusterBuilder
+  public class ClusterBuilder
   {
-    public static int SIZE = 100000;
+    private readonly int _size;
 
-    public static string[][] BuildCluster(string path, out Dictionary<string, object> header)
+    public  ClusterBuilder(int size)
+    {
+      _size = size;
+    }
+
+    public string[][] BuildCluster(string path, out Dictionary<string, object> header)
     {
       using (var zip = new KorapZip(path))
       {
@@ -34,7 +39,7 @@ namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
       }
     }
 
-    private static string[][] MakePartition(string[] docs)
+    private string[][] MakePartition(string[] docs)
     {
       var res = new List<string[]>();
       var cur = new List<string>();
@@ -46,7 +51,7 @@ namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
           doc = doc.Substring(0, doc.Length - 1);
 
         cur.Add(doc);
-        if (cur.Count <= SIZE)
+        if (cur.Count <= _size)
           continue;
 
         res.Add(cur.ToArray());
