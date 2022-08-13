@@ -4,6 +4,8 @@ using CorpusExplorer.Sdk.Extern.Xml.Helper;
 using CorpusExplorer.Sdk.Extern.Xml.Ids.Exceptions;
 using CorpusExplorer.Sdk.Extern.Xml.Ids.KorAP;
 using CorpusExplorer.Sdk.Extern.Xml.Ids.KorAP.LoadStrategy;
+using CorpusExplorer.Sdk.Utils.DocumentProcessing.Cleanup;
+using CorpusExplorer.Sdk.Utils.DocumentProcessing.Cleanup.Abstract;
 using CorpusExplorer.Sdk.Utils.DocumentProcessing.Importer.Abstract;
 
 namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
@@ -123,9 +125,22 @@ namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
       else // Fals Korap keine Sätze erkannt hat, erkenne Satzgrenzen mit Hilfe der Token
         GenerateTextFallback(zip, zipPath, currentText, out refsOut, out doc, out skelOut);
 
+      doc = CleanDocument(doc);
+
       AddDocument("Wort", dsel, doc);
 
       return true;
+    }
+
+    private RegexUnicodeReplacerCleanup _cleanup = new();
+
+    private string[][] CleanDocument(string[][] doc)
+    {
+      foreach (var s in doc)
+        for (var j = 0; j < s.Length; j++)
+          s[j] = _cleanup.Bypass(s[j]);
+
+      return doc;
     }
 
     private static int[] DetectSentences(KorapZip zip, string path, string textRoot)

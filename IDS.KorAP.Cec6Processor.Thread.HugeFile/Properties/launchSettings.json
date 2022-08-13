@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "IDS.KorAP.Cec6Processor.Thread.HugeFile": {
+      "commandName": "Project",
+      "commandLineArgs": "C:\\Users\\Jan\\Desktop\\ndy_sample_2.zip"
+    }
+  }
+}

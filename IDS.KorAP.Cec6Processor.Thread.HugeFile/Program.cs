@@ -1,8 +1,13 @@
 ﻿using System.Diagnostics;
+using System.Reflection;
 using System.Runtime.Serialization.Formatters.Binary;
+using System.Text;
+using CorpusExplorer.Sdk.Ecosystem;
+using CorpusExplorer.Sdk.Ecosystem.Model;
 using CorpusExplorer.Sdk.Helper;
 using CorpusExplorer.Sdk.Model.Adapter.Corpus;
 using CorpusExplorer.Sdk.Utils.CorpusManipulation;
+using CorpusExplorer.Sdk.Utils.DocumentProcessing.Builder;
 
 namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
 {
@@ -17,6 +22,8 @@ namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
 
     static void Main(string[] args)
     {
+      CorpusExplorerEcosystem.InitializeMinimal();
+
       if (args.Length == 1)
         MainProcess(args[0]);
       else if (args.Length == 4)
@@ -52,9 +59,7 @@ namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
 
         var merger = new CorpusMerger();
         foreach (var file in files)
-        {
           merger.Input(CorpusAdapterWriteDirect.Create(file));
-        }
 
         merger.Execute();
         merger.Output.First().Save(Path.Combine($"/home/ruediger/CEC6/{Path.GetFileNameWithoutExtension(path)}.cec6.lz4"));
@@ -78,7 +83,7 @@ namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
         ImportTreeTagger = ImportTreeTagger,
         ReadTaxonomy = false
       };
-      importer.Execute(new[] { path }).FirstOrDefault()?.Save(output);
+      importer.Execute(new[] { path }).FirstOrDefault().Save(output);
     }
 
     private static void Serialize(Dictionary<string, object> data, string path)
