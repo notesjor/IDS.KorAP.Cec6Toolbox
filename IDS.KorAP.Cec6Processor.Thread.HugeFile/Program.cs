@@ -53,8 +53,12 @@ namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
           var output = Path.Combine(dir.Path, $"{Guid.NewGuid():N}.cec6.lz4");
           files.Add(output);
 
+#if DEBUG
+          SubProcess(path, headFile, session, output);
+#else
           var process = Process.Start("/home/ruediger/TOOLBOX/PROCESSOR/IDS.KorAP.Cec6Processor.Thread.HugeFile", new[] { path, headFile, session, output });
           process.WaitForExit();
+#endif
         });
 
         var merger = new CorpusMerger();
@@ -62,7 +66,11 @@ namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
           merger.Input(CorpusAdapterWriteDirect.Create(file));
 
         merger.Execute();
+        #if DEBUG
+        merger.Output.First().Save(Path.Combine("corpus.cec6.lz4"));
+        #else
         merger.Output.First().Save(Path.Combine($"/home/ruediger/CEC6/{Path.GetFileNameWithoutExtension(path)}.cec6.lz4"));
+        #endif
       }
     }
 
