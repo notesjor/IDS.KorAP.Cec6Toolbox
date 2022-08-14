@@ -125,9 +125,7 @@ namespace IDS.KorAP.Cec6Processor.Thread.HugeFile
       else // Fals Korap keine Sätze erkannt hat, erkenne Satzgrenzen mit Hilfe der Token
         GenerateTextFallback(zip, zipPath, currentText, out refsOut, out doc, out skelOut);
 
-      doc = CleanDocument(doc);
-
-      AddDocument("Wort", dsel, doc);
+      AddDocument("Wort", dsel, CleanDocument(doc));
 
       return true;
     }
