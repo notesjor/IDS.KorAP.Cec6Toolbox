@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using CorpusExplorer.Sdk.Helper;
 
 namespace Compute.DeReKo.Cec6TimeMergeHelper
 {
@@ -67,8 +68,8 @@ namespace Compute.DeReKo.Cec6TimeMergeHelper
       process.WaitForExit();
 
 
-      var lines = text.Split(new []{"\r\n", "\r", "\n"}, StringSplitOptions.RemoveEmptyEntries);
-      return (from line in lines select line.Split(new[] {" ", "\t"}, StringSplitOptions.RemoveEmptyEntries) into split where split.Length >= 5 select split.Last().Replace(".cec6.gz", "").Replace(".cec6", "")).ToArray();
+      var lines = text.Split(Splitter.LineBreaks, StringSplitOptions.RemoveEmptyEntries);
+      return (from line in lines select line.Split(Splitter.TabAndSpace, StringSplitOptions.RemoveEmptyEntries) into split where split.Length >= 5 select split.Last().Replace(".cec6.gz", "").Replace(".cec6", "")).ToArray();
     }
   }
 }

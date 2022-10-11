@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using CorpusExplorer.Sdk.Helper;
 
 namespace IDS.KorAP.Cec6Processor
 {
@@ -94,7 +95,7 @@ namespace IDS.KorAP.Cec6Processor
       var lines = File.ReadAllLines("catalog.tsv", Encoding.UTF8);
       foreach (var line in lines)
       {
-        var entry = line.Split(new[] { "\t" }, StringSplitOptions.RemoveEmptyEntries);
+        var entry = line.Split(Splitter.Tab, StringSplitOptions.RemoveEmptyEntries);
         if (entry.Length != 2)
           continue;
 

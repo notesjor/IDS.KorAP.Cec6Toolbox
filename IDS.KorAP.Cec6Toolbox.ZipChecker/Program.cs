@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using CorpusExplorer.Sdk.Helper;
 
 namespace IDS.KorAP.Cec6Toolbox.ZipChecker
 {
@@ -29,7 +30,7 @@ namespace IDS.KorAP.Cec6Toolbox.ZipChecker
             RedirectStandardError = true,
           });
 
-          var entries = process.StandardOutput.ReadToEnd().Split(new []{"\r\n", "\r", "\n"}, StringSplitOptions.RemoveEmptyEntries);
+          var entries = process.StandardOutput.ReadToEnd().Split(Splitter.LineBreaks, StringSplitOptions.RemoveEmptyEntries);
           var zipError = process.StandardError.ReadToEnd();
           process.WaitForExit();
 
