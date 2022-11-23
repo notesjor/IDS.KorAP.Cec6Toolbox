@@ -79,9 +79,16 @@ namespace IDS.KorAP.Cec6Toolbox.GuidIndex
       var filter = args[1];
       var output = args[2];
 
-      var sigleFile = Path.Combine(output, "sigle.idx");
-      var metasFile = Path.Combine(output, "meta.idx");
-      var corpusFile = Path.Combine(output, "corpus.idx");
+      var sigleDir = Path.Combine(output, "sigle");
+      var metasDir = Path.Combine(output, "meta");
+      var corpuDir = Path.Combine(output, "corpus");
+
+      if (!Directory.Exists(sigleDir))
+        Directory.CreateDirectory(sigleDir);
+      if (!Directory.Exists(metasDir))
+        Directory.CreateDirectory(metasDir);
+      if (!Directory.Exists(corpuDir))
+        Directory.CreateDirectory(corpuDir);
 
       CorpusExplorerEcosystem.InitializeMinimal();
       var files = Directory.GetFiles(input, filter, SearchOption.TopDirectoryOnly);
@@ -90,64 +97,55 @@ namespace IDS.KorAP.Cec6Toolbox.GuidIndex
       var cnt = 0;
       var locked = new object();
 
-      var l1 = new object();
-      var l2 = new object();
-      var l3 = new object();
-
-      using (var fs1 = new FileStream(corpusFile, FileMode.Create, FileAccess.Write))
-      using (var fs2 = new FileStream(sigleFile, FileMode.Create, FileAccess.Write))
-      using (var fs3 = new FileStream(metasFile, FileMode.Create, FileAccess.Write))
-      using (var w1 = new StreamWriter(fs1, Encoding.UTF8))
-      using (var w2 = new StreamWriter(fs2, Encoding.UTF8))
-      using (var w3 = new StreamWriter(fs3, Encoding.UTF8))
-        Parallel.ForEach(files, new ParallelOptions { MaxDegreeOfParallelism = 20 }, file =>
+      Parallel.ForEach(files, new ParallelOptions { MaxDegreeOfParallelism = 40 }, file =>
+      {
+        try
         {
-          try
-          {
-            using (var corpus = CorpusAdapterWriteDirect.Create(file))
-              foreach (var meta in corpus.DocumentMetadata)
+          using (var fs1 = new FileStream(Path.Combine(sigleDir, Path.GetFileName(file)), FileMode.Create, FileAccess.Write))
+          using (var fs2 = new FileStream(Path.Combine(metasDir, Path.GetFileName(file)), FileMode.Create, FileAccess.Write))
+          using (var fs3 = new FileStream(Path.Combine(corpuDir, Path.GetFileName(file)), FileMode.Create, FileAccess.Write))
+          using (var w1 = new StreamWriter(fs1, Encoding.UTF8))
+          using (var w2 = new StreamWriter(fs2, Encoding.UTF8))
+          using (var w3 = new StreamWriter(fs3, Encoding.UTF8))
+          using (var corpus = CorpusAdapterWriteDirect.Create(file))
+            foreach (var meta in corpus.DocumentMetadata)
+            {
+              var guid = meta.Key;
+              w1.WriteLine($"{guid}\t{Path.GetFileName(file)}");
+
+              if (meta.Value == null)
               {
-                var guid = meta.Key;
-                var s1 = $"{guid}\t{Path.GetFileName(file)}";
-                lock (l1)
-                  w1.WriteLine(s1);
-
-                if (meta.Value == null)
-                {
-                  var se = $"{guid}\tNONE-SEE-CORPUS";
-                  lock (l2)
-                    w2.WriteLine(se);
-                  lock (l3)
-                    w3.WriteLine(se);
-                }
-                else
-                {
-                  var s2 = meta.Value.ContainsKey("ZipPath")
-                    ? $"{guid}\t{meta.Value["ZipPath"]}"
-                    : $"{guid}\tNONE-SEE-CORPUS";
-                  lock (l2)
-                    w2.WriteLine(s2);
-
-                  var s3 = $"{guid}\t{JsonConvert.SerializeObject(meta.Value).Replace("\t", " ").Replace("\r", " ").Replace("\n", " ").Replace("  ", " ").Replace("  ", " ").Replace("  ", " ")}";
-                  lock (l3)
-                    w3.WriteLine(s3);
-                }
+                var se = $"{guid}\tNONE-SEE-CORPUS";
+                w2.WriteLine(se);
+                w3.WriteLine(se);
               }
-            lock (locked)
-            {
-              cnt++;
-              Console.WriteLine($"{cnt}/{max}");
+              else
+              {
+                w2.WriteLine(meta.Value.ContainsKey("ZipPath")
+                ? $"{guid}\t{meta.Value["ZipPath"]}"
+                : $"{guid}\tNONE-SEE-CORPUS");
+
+                var m = meta.Value;
+                if (m.ContainsKey("Taxonomy"))
+                  m.Remove("Taxonomy");
+                w3.WriteLine($"{guid}\t{JsonConvert.SerializeObject(m).Replace("\t", " ").Replace("\r", " ").Replace("\n", " ").Replace("  ", " ").Replace("  ", " ").Replace("  ", " ")}");
+              }
             }
-          }
-          catch (Exception ex)
+          lock (locked)
           {
-            lock (locked)
-            {
-              Console.WriteLine(ex.Message);
-              Console.WriteLine(ex.StackTrace);
-            }
+            cnt++;
+            Console.WriteLine($"{cnt}/{max}");
           }
-        });
+        }
+        catch (Exception ex)
+        {
+          lock (locked)
+          {
+            Console.WriteLine(ex.Message);
+            Console.WriteLine(ex.StackTrace);
+          }
+        }
+      });
     }
   }
 }
