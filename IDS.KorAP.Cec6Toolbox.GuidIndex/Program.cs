@@ -75,6 +75,10 @@ namespace IDS.KorAP.Cec6Toolbox.GuidIndex
           }
         }
       });
+
+      if (queries.Count > 0)
+        foreach(var q in queries)
+          writer.WriteLine($"{q}\tNOT FOUND");
     }
 
     private static void BuildIndex(string[] args)
