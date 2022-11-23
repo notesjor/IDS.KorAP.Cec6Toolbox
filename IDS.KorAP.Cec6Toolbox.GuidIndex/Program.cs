@@ -18,12 +18,6 @@ namespace IDS.KorAP.Cec6Toolbox.GuidIndex
     private static void SearchIndex(string[] args)
     {
       var input = args[0];
-      var sigleFile = Path.Combine(input, "sigle.idx");
-      var metasFile = Path.Combine(input, "meta.idx");
-      var corpuFile = Path.Combine(input, "corpus.idx");
-
-      if (!File.Exists(sigleFile) || !File.Exists(metasFile))
-        return;
 
       var mode = args[1];
       var queries = new HashSet<Guid>(File.ReadLines(args[2]).Select(Guid.Parse));
@@ -34,43 +28,53 @@ namespace IDS.KorAP.Cec6Toolbox.GuidIndex
         switch (mode)
         {
           case "corpus":
-            SearchIndexCall(corpuFile, queries, writer);
+            SearchIndexCall(Path.Combine(input, "corpus"), queries, writer);
             break;
           case "sigle":
-            SearchIndexCall(sigleFile, queries, writer);
+            SearchIndexCall(Path.Combine(input, "sigle"), queries, writer);
             break;
           case "meta":
-            SearchIndexCall(metasFile, queries, writer);
+            SearchIndexCall(Path.Combine(input, "meta"), queries, writer);
             break;
         }
     }
 
-    private static void SearchIndexCall(string indexFile, HashSet<Guid> queries, StreamWriter writer)
+    private static void SearchIndexCall(string directory, HashSet<Guid> queries, StreamWriter writer)
     {
-      using (var fs = new FileStream(indexFile, FileMode.Open, FileAccess.Read))
-      using (var reader = new StreamReader(fs, Encoding.UTF8))
+      var lock1 = new object();
+      var lock2 = new object();
+
+      Parallel.ForEach(Directory.GetFiles(directory), file =>
       {
-        while (!reader.EndOfStream && queries.Count > 0)
+        using (var fs = new FileStream(file, FileMode.Open, FileAccess.Read))
+        using (var reader = new StreamReader(fs, Encoding.UTF8))
         {
-          try
+          while (!reader.EndOfStream && queries.Count > 0)
           {
-            var line = reader.ReadLine();
-            var parts = line.Split('\t');
-            var guid = Guid.Parse(parts[0]);
+            try
+            {
+              var line = reader.ReadLine();
+              var parts = line.Split('\t');
+              var guid = Guid.Parse(parts[0]);
 
-            if (!queries.Contains(guid))
-              continue;
+              lock (lock1)
+              {
+                if (!queries.Contains(guid))
+                  continue;
 
-            queries.Remove(guid);
-            writer.WriteLine(line); // Schreibt komplette LINE (SIGLE oder META)
-          }
-          catch (Exception ex)
-          {
-            Console.WriteLine(ex.Message);
-            Console.WriteLine(ex.StackTrace);
+                queries.Remove(guid);
+              }
+              lock (lock2)
+                writer.WriteLine(line);
+            }
+            catch (Exception ex)
+            {
+              Console.WriteLine(ex.Message);
+              Console.WriteLine(ex.StackTrace);
+            }
           }
         }
-      }
+      });
     }
 
     private static void BuildIndex(string[] args)
@@ -101,34 +105,34 @@ namespace IDS.KorAP.Cec6Toolbox.GuidIndex
       {
         try
         {
-          using (var fs1 = new FileStream(Path.Combine(sigleDir, Path.GetFileName(file)), FileMode.Create, FileAccess.Write))
-          using (var fs2 = new FileStream(Path.Combine(metasDir, Path.GetFileName(file)), FileMode.Create, FileAccess.Write))
-          using (var fs3 = new FileStream(Path.Combine(corpuDir, Path.GetFileName(file)), FileMode.Create, FileAccess.Write))
-          using (var w1 = new StreamWriter(fs1, Encoding.UTF8))
-          using (var w2 = new StreamWriter(fs2, Encoding.UTF8))
-          using (var w3 = new StreamWriter(fs3, Encoding.UTF8))
-          using (var corpus = CorpusAdapterWriteDirect.Create(file))
+          using (var fsC = new FileStream(Path.Combine(corpuDir, Path.GetFileName(file)), FileMode.Create, FileAccess.Write))
+          using (var fsS = new FileStream(Path.Combine(sigleDir, Path.GetFileName(file)), FileMode.Create, FileAccess.Write))
+          using (var fsM = new FileStream(Path.Combine(metasDir, Path.GetFileName(file)), FileMode.Create, FileAccess.Write))
+          using (var wC = new StreamWriter(fsC, Encoding.UTF8))
+          using (var wS = new StreamWriter(fsS, Encoding.UTF8))
+          using (var wM = new StreamWriter(fsM, Encoding.UTF8))
+          using (var corpus = CorpusAdapterWriteIndirect.Create(file))
             foreach (var meta in corpus.DocumentMetadata)
             {
               var guid = meta.Key;
-              w1.WriteLine($"{guid}\t{Path.GetFileName(file)}");
+              wC.WriteLine($"{guid}\t{Path.GetFileName(file)}");
 
               if (meta.Value == null)
               {
-                var se = $"{guid}\tNONE-SEE-CORPUS";
-                w2.WriteLine(se);
-                w3.WriteLine(se);
+                var se = $"{guid}\tNONE";
+                wS.WriteLine(se);
+                wM.WriteLine(se);
               }
               else
               {
-                w2.WriteLine(meta.Value.ContainsKey("ZipPath")
+                wS.WriteLine(meta.Value.ContainsKey("ZipPath")
                 ? $"{guid}\t{meta.Value["ZipPath"]}"
-                : $"{guid}\tNONE-SEE-CORPUS");
+                : $"{guid}\tNONE");
 
                 var m = meta.Value;
                 if (m.ContainsKey("Taxonomy"))
                   m.Remove("Taxonomy");
-                w3.WriteLine($"{guid}\t{JsonConvert.SerializeObject(m).Replace("\t", " ").Replace("\r", " ").Replace("\n", " ").Replace("  ", " ").Replace("  ", " ").Replace("  ", " ")}");
+                wM.WriteLine($"{guid}\t{JsonConvert.SerializeObject(m).Replace("\t", " ").Replace("\r", " ").Replace("\n", " ").Replace("  ", " ").Replace("  ", " ").Replace("  ", " ")}");
               }
             }
           lock (locked)
