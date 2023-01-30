@@ -132,20 +132,20 @@ internal class Program
   private static void WordlistClean()
   {
     var pathInput = Input("Path (input)");
-    var parallelMax = int.Parse(Input("Threads (Q1 = x/10 / Q2 = 10)"));
+    var parallelMax = int.Parse(Input("Threads (Q1 = x/5 / Q2 = 5)"));
     var pathOutput = Input("Path (output)");
 
     var files = Directory.GetFiles(pathInput, "*.lst", SearchOption.AllDirectories);
     var fCount = 0;
     var fCountLock = new object();
 
-    Parallel.ForEach(files, new ParallelOptions { MaxDegreeOfParallelism = parallelMax / 10 }, file =>
+    Parallel.ForEach(files, new ParallelOptions { MaxDegreeOfParallelism = parallelMax / 5 }, file =>
     {
       var outputFile = Path.Combine(pathOutput, Path.GetFileName(file));
       try
       {
         var ts = DateTime.Now;
-        var max = 10000;
+        var max = 1000000;
 
         using (var fsIn = new FileStream(file, FileMode.Open, FileAccess.Read))
         using (var bufferIn = new BufferedStream(fsIn, 4096))
@@ -166,11 +166,11 @@ internal class Program
             if (aList.Count < max)
               continue;
 
-            WordlistClean_Add(aList, pathOutput);
+            WordlistClean_Add(aList, outputFile);
           } while (!reader.EndOfStream);
 
           if(aList.Count > 0)
-            WordlistClean_Add(aList, pathOutput);
+            WordlistClean_Add(aList, outputFile);
         }
 
         lock (fCountLock)
@@ -178,23 +178,26 @@ internal class Program
           Console.WriteLine($"{++fCount:D4}/{files.Length:D4} (in {(DateTime.Now - ts).Seconds}s)");
         }
       }
-      catch
+      catch (Exception ex)
       {
+        Console.WriteLine(file);
+        Console.WriteLine(ex.Message);
+        Console.WriteLine(ex.StackTrace);
         File.Copy(file, outputFile);
       }
     });
   }
 
-  private static void WordlistClean_Add(List<string> aList, string pathOutput)
+  private static void WordlistClean_Add(List<string> aList, string outputFile)
   {
     var bList = new ConcurrentBag<string>();
-    Parallel.ForEach(aList, new ParallelOptions { MaxDegreeOfParallelism = 10 }, x =>
+    Parallel.ForEach(aList, new ParallelOptions { MaxDegreeOfParallelism = 5 }, x =>
     {
       if (WordlistCleanFunction(x))
         bList.Add(x);
     });
 
-    File.AppendAllLines(pathOutput, bList, _utf8WithoutBom);
+    File.AppendAllLines(outputFile, bList, _utf8WithoutBom);
   }
 
   private static bool WordlistCleanFunction(string token)
