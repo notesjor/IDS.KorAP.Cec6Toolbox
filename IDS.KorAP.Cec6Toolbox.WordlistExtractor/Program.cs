@@ -4,11 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using CorpusExplorer.Sdk.Blocks;
 using CorpusExplorer.Sdk.Ecosystem;
-using CorpusExplorer.Sdk.Helper;
 using CorpusExplorer.Sdk.Model.Adapter.Corpus;
-using CorpusExplorer.Sdk.Model.Extension;
 
 namespace IDS.KorAP.Cec6Toolbox.WordlistExtractor
 {
@@ -48,20 +45,10 @@ namespace IDS.KorAP.Cec6Toolbox.WordlistExtractor
           var ts = DateTime.Now;
 
           var corpus = CorpusAdapterWriteDirect.Create(file);
-          var select = corpus.ToSelection();
-          var block = select.CreateBlock<Frequency1LayerBlock>();
-          block.LayerDisplayname = layer;
-          block.Calculate();
-
-          var values = block.Frequency?.Keys.ToArray();
-          if (values == null)
-            return;
-
-          File.WriteAllLines(fn, values, utf8WithoutBom);
+          File.WriteAllLines(fn, corpus.GetLayers(layer).Single().Values, utf8WithoutBom);
           lock (fCountLock)
             Console.WriteLine($"{++fCount:D5}/{files.Length}: {file} (in {(DateTime.Now - ts).Seconds}s)");
 
-          block.Frequency.Clear();
           corpus.Dispose();
         }
         catch (Exception ex)
@@ -87,7 +74,7 @@ namespace IDS.KorAP.Cec6Toolbox.WordlistExtractor
         File.Delete(pathOutputFile);
       File.Create(pathOutputFile).Close();
 
-      var chunks = (Directory.GetFiles(pathOutputDir, "*.lst", SearchOption.TopDirectoryOnly)).Chunk(parallelMax).ToArray();
+      var chunks = Directory.GetFiles(pathOutputDir, "*.lst", SearchOption.TopDirectoryOnly).Chunk(parallelMax).ToArray();
       fCount = 0;
       var lstLock = new object();
 
