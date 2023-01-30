@@ -27,12 +27,9 @@ namespace IDS.KorAP.Cec6Toolbox.WordlistToolbox
             WordlistClean();
             break;
           case "3":
-            WordlistMerge();
-            break;
-          case "4":
             WordlistTo_W2I();
             break;
-          case "5":
+          case "4":
             WordlistTo_W2I_and_WI2();
             break;
           case "Q":
@@ -52,8 +49,7 @@ namespace IDS.KorAP.Cec6Toolbox.WordlistToolbox
       Console.WriteLine("Options:");
       Console.WriteLine("1) Extract Wordlist");
       Console.WriteLine("2) Clean Wordlist");
-      Console.WriteLine("3) Merge Wordlist");
-      Console.WriteLine("4) Wordlist to RocksDB (W2I only)");
+      Console.WriteLine("3) Wordlist to RocksDB (W2I only)");
       Console.WriteLine("4) Wordlist to RocksDB (W2I and WI2)");
       Console.WriteLine("");
       Console.WriteLine("Q) QUIT");
@@ -171,62 +167,16 @@ namespace IDS.KorAP.Cec6Toolbox.WordlistToolbox
       });
     }
 
-    private static Regex _wordlistCleanFunctionRegex01 = new(@"[\+\-#\?_\/\:\\]{3,}");
-    private static Regex _wordlistCleanFunctionRegex02 = new(@"^\<");
-    private static Regex _wordlistCleanFunctionRegex03 = new(@"\>$");
-    
+    /// <summary>
+    /// - Keine Leerzeichen im Token \s
+    /// - Keine Tokens mit mehr als 3 Zeichen aus dem Set + - # ? _ / \ : - z. B. +++ oder :// [https://]
+    /// - Keine Tokens mit &lt; am Anfang oder &gt; am Ende
+    /// </summary>
+    private static Regex _wordlistCleanFunctionRegex = new(@"\s|[\+\-#\?_\/\:\\]{3,}|^\<|\>$");
+
     private static bool WordlistCleanFunction(ref string token) 
       => token.Length < 75 &&
-         !_wordlistCleanFunctionRegex01.IsMatch(token) &&
-         !_wordlistCleanFunctionRegex02.IsMatch(token) && 
-         !_wordlistCleanFunctionRegex03.IsMatch(token);
-
-    private static void WordlistMerge()
-    {
-      var pathInput = Input("Path (input)");
-      var parallelMax = int.Parse(Input("Threads"));
-      var pathOutput = Input("File (output)");
-
-      var chunks = Directory.GetFiles(pathInput, "*.lst", SearchOption.TopDirectoryOnly).Chunk(parallelMax).ToArray();
-      var fCount = 0;
-      var fCountLock = new object();
-      var lstLock = new object();
-
-      Parallel.ForEach(chunks, new ParallelOptions { MaxDegreeOfParallelism = parallelMax }, chunk =>
-      {
-        var ts = DateTime.Now;
-
-        // Schritt 1 - Lade Chunk-Liste
-        var hashSet = new HashSet<string>();
-        foreach (var file in chunk)
-        foreach (var line in File.ReadAllLines(file, _utf8WithoutBom))
-          hashSet.Add(line);
-
-        lock (lstLock)
-        {
-          // Schritt 2 - Bereinige Chunk-Liste
-          using (var fs = new FileStream(pathOutput, FileMode.Open, FileAccess.Read))
-          using (var buffer = new BufferedStream(fs, 4096))
-          using (var reader = new StreamReader(buffer, _utf8WithoutBom))
-          {
-            while (!reader.EndOfStream)
-            {
-              var token = reader.ReadLine();
-              if (string.IsNullOrWhiteSpace(token))
-                continue; 
-              hashSet.Remove(token);
-            }
-          }
-
-          // Schritt 3 - Schreibe Chunk-Liste
-          File.AppendAllLines(pathOutput, hashSet, _utf8WithoutBom);
-          lock (fCountLock)
-            Console.WriteLine($"{++fCount:D4}/{chunks.Length:D4} (in {(DateTime.Now - ts).Seconds}s)");
-        }
-      });
-
-      Console.WriteLine("END!");
-    }
+         !_wordlistCleanFunctionRegex.IsMatch(token);
 
     private static void WordlistTo_W2I()
     {
