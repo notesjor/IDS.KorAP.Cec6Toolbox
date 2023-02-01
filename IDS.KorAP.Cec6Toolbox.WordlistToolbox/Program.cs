@@ -16,10 +16,11 @@ internal class Program
 
   /// <summary>
   ///   - Keine Leerzeichen im Token \s
+  ///   - Keine Sequenz von xyx - entsteht im KorAP-Prozess z. B. xyxHTMLxyx
   ///   - Keine Tokens mit mehr als 3 Zeichen aus dem Set + - # ? _ / \ : - z. B. +++ oder :// [https://]
   ///   - Keine Tokens mit &lt; am Anfang oder &gt; am Ende
   /// </summary>
-  private static readonly Regex _wordlistCleanFunctionRegex = new(@"\s|[\+\-#\?_\/\:\\]{3,}|^\<|\>$");
+  private static readonly Regex _wordlistCleanFunctionRegex = new(@"\s|xyx|[\+\-#\?_\/\:\\]{3,}|^\<|\>$");
 
   private static void Main()
   {
