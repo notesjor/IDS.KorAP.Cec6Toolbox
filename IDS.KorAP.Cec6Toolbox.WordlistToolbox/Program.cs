@@ -192,60 +192,32 @@ internal class Program
 
     var idP = Path.Combine(pathOutput, "current.idx");
     var w2i = new EasyRocksDb(Path.Combine(pathOutput, "w2i"), true);
-    var cache = new HashSet<string>();
 
     var idx = File.Exists(idP) ? int.Parse(File.ReadAllText(idP)) : 0;
+    File.WriteAllText(idP, idx.ToString());
 
-    var files = Directory.GetFiles(pathInput, "*.lst", SearchOption.AllDirectories);
-    var count = 1;
+    var tlist = GetWordIndexStack(pathInput);
+    var tcount = tlist.Count;
 
-    foreach (var file in files)
+    while(tlist.Count > 0)
     {
-      var ts = DateTime.Now;
-      var sum = WordlistTo_W2I_Add(file, w2i, ref idx, ref cache);
-
-      File.WriteAllText(idP, idx.ToString());
-      Console.WriteLine(
-        $"{count++:D4}/{files.Length:D4} ({sum:D6} new) - {file} - [in {(DateTime.Now - ts).Seconds}s]");
+      var page = tlist.Dequeue();
+      idx = WordlistTo_W2I_Add(w2i,  idx, ref page);
+      Console.WriteLine($"PAGE: {tcount - tlist.Count:D5}/{tcount:D5}");
     }
 
     w2i.Dispose();
+
+    File.WriteAllText(idP, idx.ToString());
   }
 
-  private static int WordlistTo_W2I_Add(string path, EasyRocksDb w2i, ref int idx, ref HashSet<string> cache)
+  private static int WordlistTo_W2I_Add(EasyRocksDb w2i, int idx, ref string[] page)
   {
-    // Bereinige Token die im Cache sind
-    var lines = File.ReadAllLines(path, _utf8WithoutBom);
-    var token = new List<string>(lines.Length);
-    foreach (var x in lines)
-    {
-      if(!cache.Contains(x))
-        token.Add(x);
-    }
-
-    // Leere Cache
-    cache.Clear();
-
-    // Finde Token in RDB
-    var dict = w2i.GetBatch(token.ToArray());
-    var t2i = new Dictionary<string, string>();
-
-    // Sortiere Token in Cache und T2I
-    foreach (var x in dict)
-    {
-      if (string.IsNullOrEmpty(x.Value)) // Füge neuen Token Index hinzu
-        t2i.Add(x.Key, idx++.ToString());
-      else
-        cache.Add(x.Key); // Cache bekannte Token für nächste Runde
-    }
-
+    var t2i = page.ToDictionary(x=>x, _=> $"{idx++}");
     w2i.PutBatch(t2i);
-
-    var res = t2i.Count;
-
     t2i.Clear();
-    
-    return res;
+
+    return idx;
   }
 
   private static void WordlistTo_W2I_and_WI2()
@@ -256,65 +228,62 @@ internal class Program
     var idP = Path.Combine(pathOutput, "current.idx");
     var w2i = new EasyRocksDb(Path.Combine(pathOutput, "w2i"), true);
     var i2w = new EasyRocksDb(Path.Combine(pathOutput, "i2w"), true);
-    var cache = new HashSet<string>();
 
     var idx = File.Exists(idP) ? int.Parse(File.ReadAllText(idP)) : 0;
+    File.WriteAllText(idP, idx.ToString());
 
-    var files = Directory.GetFiles(pathInput, "*.lst", SearchOption.AllDirectories);
-    var count = 1;
+    var tlist = GetWordIndexStack(pathInput);
+    var tcount = tlist.Count;
 
-    foreach (var file in files)
+    while(tlist.Count > 0)
     {
-      var ts = DateTime.Now;
-      var sum = WordlistTo_W2I_and_WI2_Add(file, w2i, i2w, ref idx, ref cache);
-
-      File.WriteAllText(idP, idx.ToString());
-      Console.WriteLine(
-        $"{count++:D4}/{files.Length:D4} ({sum:D6} new) - {file} - [in {(DateTime.Now - ts).Seconds}s]");
+      var page = tlist.Dequeue();
+      idx = WordlistTo_W2I_and_WI2_Add(w2i, i2w, idx, ref page);
+      Console.WriteLine($"PAGE: {tcount - tlist.Count:D5}/{tcount:D5}");
     }
 
     w2i.Dispose();
     i2w.Dispose();
+
+    File.WriteAllText(idP, idx.ToString());
   }
 
-  private static int WordlistTo_W2I_and_WI2_Add(string path, EasyRocksDb w2i, EasyRocksDb i2w, ref int idx, ref HashSet<string> cache)
+  private static Queue<string[]> GetWordIndexStack(string pathInput)
   {
-    // Bereinige Token die im Cache sind
-    var lines = File.ReadAllLines(path, _utf8WithoutBom);
-    var token = new List<string>(lines.Length);
-    foreach (var x in lines)
+    var files = Directory.GetFiles(pathInput, "*.lst", SearchOption.AllDirectories);
+    var count = 1;
+
+    var tlist = new HashSet<string>(150000000);
+
+    foreach (var file in files)
     {
-      if(!cache.Contains(x))
-        token.Add(x);
+      var ts = DateTime.Now;
+
+      var cold = tlist.Count;
+      var lines = File.ReadAllLines(file, _utf8WithoutBom);
+      foreach (var x in lines)
+        tlist.Add(x);
+
+      Console.WriteLine(
+        $"{count++:D4}/{files.Length:D4} ({cold:D6} > {lines.Length:D6} > {tlist.Count} [{tlist.Count - cold} new]) - {file} - [in {(DateTime.Now - ts).Seconds}s]");
     }
+    
+    Console.WriteLine("CHUNKING...");
+    return new Queue<string[]>(tlist.Chunk(10000));
+  }
 
-    // Leere Cache
-    cache.Clear();
-
-    // Finde Token in RDB
-    var dict = w2i.GetBatch(token.ToArray());
-    var t2i = new Dictionary<string, string>();
-
-    // Sortiere Token in Cache und T2I
-    foreach (var x in dict)
-    {
-      if (string.IsNullOrEmpty(x.Value)) // Füge neuen Token Index hinzu
-        t2i.Add(x.Key, idx++.ToString());
-      else
-        cache.Add(x.Key); // Cache bekannte Token für nächste Runde
-    }
+  private static int WordlistTo_W2I_and_WI2_Add(EasyRocksDb w2i, EasyRocksDb i2w, int idx, ref string[] page)
+  {
+    var t2i = page.ToDictionary(x=>x, _=> $"{idx++}");
+    w2i.PutBatch(t2i);
 
     // Index spiegeln
     var i2t = t2i.ToDictionary(x => x.Value, x => x.Key);
-
-    w2i.PutBatch(t2i);
     i2w.PutBatch(i2t);
-
-    var res = t2i.Count;
-
+    
     t2i.Clear();
     i2t.Clear();
 
-    return res;
+    return idx;
   }
 }
