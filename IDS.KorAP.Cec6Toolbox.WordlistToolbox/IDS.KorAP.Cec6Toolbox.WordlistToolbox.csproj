@@ -9,7 +9,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\CorpusExplorerV2\CorpusExplorer\BitCutStudios.CorpusExplorer\BitCutStudios.CorpusExplorer.csproj" />
-    <ProjectReference Include="..\..\..\CorpusExplorerV2\CorpusExplorer\CorpusExplorer.Sdk.Db.RocksDb\CorpusExplorer.Sdk.Db.RocksDb.csproj" />
     <ProjectReference Include="..\..\..\CorpusExplorerV2\CorpusExplorer\CorpusExplorer.Sdk.Diagnostic\CorpusExplorer.Sdk.Diagnostic.csproj" />
     <ProjectReference Include="..\..\..\CorpusExplorerV2\CorpusExplorer\CorpusExplorer.Sdk\CorpusExplorer.Sdk.csproj" />
   </ItemGroup>

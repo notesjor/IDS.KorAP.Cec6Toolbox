@@ -3,10 +3,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
-using CorpusExplorer.Sdk.Db.RocksDb;
 using CorpusExplorer.Sdk.Ecosystem;
 using CorpusExplorer.Sdk.Model.Adapter.Corpus;
-using RocksDbSharp;
 
 namespace IDS.KorAP.Cec6Toolbox.WordlistToolbox;
 
@@ -39,10 +37,11 @@ internal class Program
           WordlistClean();
           break;
         case "3":
-          WordlistTo_W2I();
           break;
         case "4":
-          WordlistTo_W2I_and_WI2();
+          break;
+        case "5":
+          WordlistTo_WFile();
           break;
         case "Q":
         case "q":
@@ -62,8 +61,7 @@ internal class Program
     Console.WriteLine("Options:");
     Console.WriteLine("1) Extract Wordlist");
     Console.WriteLine("2) Clean Wordlist");
-    Console.WriteLine("3) Wordlist to RocksDB (W2I only)");
-    Console.WriteLine("4) Wordlist to RocksDB (W2I and WI2)");
+    Console.WriteLine("5) Wordlist WFile");
     Console.WriteLine("");
     Console.WriteLine("Q) QUIT");
     return Input("Select option (1-5 / Q)");
@@ -108,7 +106,7 @@ internal class Program
         File.WriteAllLines(fn, corpus.GetLayers(layer).Single().Values, _utf8WithoutBom);
         lock (fCountLock)
         {
-          Console.WriteLine($"{++fCount:D5}/{files.Length}: {file} (in {(DateTime.Now - ts).Seconds}s)");
+          Console.WriteLine($"{++fCount:D5}/{files.Length}: {file} (in {(DateTime.Now - ts).TotalSeconds}s)");
         }
 
         corpus.Dispose();
@@ -153,21 +151,21 @@ internal class Program
         var vList = new ConcurrentBag<string>();
         var lines = File.ReadAllLines(file, _utf8WithoutBom);
         Parallel.ForEach(lines, new ParallelOptions { MaxDegreeOfParallelism = 5 }, x =>
-        {
-          if (WordlistCleanFunction(x))
-            vList.Add(x);
-        });
+      {
+        if (WordlistCleanFunction(x))
+          vList.Add(x);
+      });
 
         File.WriteAllLines(outputFile, vList, _utf8WithoutBom);
 
         var cIn = lines.Length;
         var cOu = vList.Count;
         var cRm = cIn - cOu;
-        
+
         vList.Clear();
-        
+
         lock (fCountLock)
-          Console.WriteLine($"{++fCount:D4}/{files.Length:D4} (in {(DateTime.Now - ts).Seconds}s) - {file} - [in: {cIn} - out: {cOu} = {cRm} removed]");
+          Console.WriteLine($"{++fCount:D4}/{files.Length:D4} (in {(DateTime.Now - ts).TotalSeconds}s) - {file} - [in: {cIn} - out: {cOu} = {cRm} removed]");
       }
       catch (Exception ex)
       {
@@ -182,73 +180,30 @@ internal class Program
   private static bool WordlistCleanFunction(string token)
   {
     return token.Length < 75 &&
-           !_wordlistCleanFunctionRegex.IsMatch(token);
+         !_wordlistCleanFunctionRegex.IsMatch(token);
   }
 
-  private static void WordlistTo_W2I()
+  private static void WordlistTo_WFile()
   {
     var pathInput = Input("Path (input)");
-    var pathOutput = Input("Path (output)");
-
-    var idP = Path.Combine(pathOutput, "current.idx");
-    var w2i = new EasyRocksDb(Path.Combine(pathOutput, "w2i"), true);
-
-    var idx = File.Exists(idP) ? int.Parse(File.ReadAllText(idP)) : 0;
-    File.WriteAllText(idP, idx.ToString());
+    var pathOutput = Input("File (output)");
 
     var tlist = GetWordIndexStack(pathInput);
     var tcount = tlist.Count;
 
-    while(tlist.Count > 0)
+    using (var fs = new FileStream(pathOutput, FileMode.Create, FileAccess.Write))
+    using (var buffer = new BufferedStream(fs, 100000000))
+    using (var writer = new StreamWriter(buffer, _utf8WithoutBom))
     {
-      var page = tlist.Dequeue();
-      idx = WordlistTo_W2I_Add(w2i,  idx, ref page);
-      Console.WriteLine($"PAGE: {tcount - tlist.Count:D5}/{tcount:D5}");
+      writer.NewLine = "\n";
+      foreach (var x in tlist)
+        writer.WriteLine(x);
     }
 
-    w2i.Dispose();
-
-    File.WriteAllText(idP, idx.ToString());
+    File.WriteAllText(pathOutput + ".idx", tlist.Count.ToString());
   }
 
-  private static int WordlistTo_W2I_Add(EasyRocksDb w2i, int idx, ref string[] page)
-  {
-    var t2i = page.ToDictionary(x=>x, _=> $"{idx++}");
-    w2i.PutBatch(t2i);
-    t2i.Clear();
-
-    return idx;
-  }
-
-  private static void WordlistTo_W2I_and_WI2()
-  {
-    var pathInput = Input("Path (input)");
-    var pathOutput = Input("Path (output)");
-
-    var idP = Path.Combine(pathOutput, "current.idx");
-    var w2i = new EasyRocksDb(Path.Combine(pathOutput, "w2i"), true);
-    var i2w = new EasyRocksDb(Path.Combine(pathOutput, "i2w"), true);
-
-    var idx = File.Exists(idP) ? int.Parse(File.ReadAllText(idP)) : 0;
-    File.WriteAllText(idP, idx.ToString());
-
-    var tlist = GetWordIndexStack(pathInput);
-    var tcount = tlist.Count;
-
-    while(tlist.Count > 0)
-    {
-      var page = tlist.Dequeue();
-      idx = WordlistTo_W2I_and_WI2_Add(w2i, i2w, idx, ref page);
-      Console.WriteLine($"PAGE: {tcount - tlist.Count:D5}/{tcount:D5}");
-    }
-
-    w2i.Dispose();
-    i2w.Dispose();
-
-    File.WriteAllText(idP, idx.ToString());
-  }
-
-  private static Queue<string[]> GetWordIndexStack(string pathInput)
+  private static HashSet<string> GetWordIndexStack(string pathInput)
   {
     var files = Directory.GetFiles(pathInput, "*.lst", SearchOption.AllDirectories);
     var count = 1;
@@ -265,25 +220,9 @@ internal class Program
         tlist.Add(x);
 
       Console.WriteLine(
-        $"{count++:D4}/{files.Length:D4} ({cold:D6} > {lines.Length:D6} > {tlist.Count} [{tlist.Count - cold} new]) - {file} - [in {(DateTime.Now - ts).Seconds}s]");
+        $"{count++:D4}/{files.Length:D4} ({cold:D6} > {lines.Length:D6} > {tlist.Count} [{tlist.Count - cold} new]) - {file} - [in {(DateTime.Now - ts).TotalSeconds}s]");
     }
-    
-    Console.WriteLine("CHUNKING...");
-    return new Queue<string[]>(tlist.Chunk(10000));
-  }
 
-  private static int WordlistTo_W2I_and_WI2_Add(EasyRocksDb w2i, EasyRocksDb i2w, int idx, ref string[] page)
-  {
-    var t2i = page.ToDictionary(x=>x, _=> $"{idx++}");
-    w2i.PutBatch(t2i);
-
-    // Index spiegeln
-    var i2t = t2i.ToDictionary(x => x.Value, x => x.Key);
-    i2w.PutBatch(i2t);
-    
-    t2i.Clear();
-    i2t.Clear();
-
-    return idx;
+    return tlist;
   }
 }
