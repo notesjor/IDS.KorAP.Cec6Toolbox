@@ -37,11 +37,11 @@ internal class Program
           WordlistClean();
           break;
         case "3":
+          WordlistTo_WFile();
           break;
         case "4":
           break;
-        case "5":
-          WordlistTo_WFile();
+        case "5":          
           break;
         case "Q":
         case "q":
@@ -56,12 +56,21 @@ internal class Program
     }
   }
 
+  private static void WFileTo_RocksDB()
+  {
+    var pathInput = Input("Path (input)");
+    var pathOutput = Input("Path (RocksDB)");
+
+    var idx = 0;
+  }
+
   private static string ShowOptions()
   {
     Console.WriteLine("Options:");
     Console.WriteLine("1) Extract Wordlist");
     Console.WriteLine("2) Clean Wordlist");
-    Console.WriteLine("5) Wordlist WFile");
+    Console.WriteLine("3) Wordlist WFile");
+    Console.WriteLine("4) WFile > RocksDB");
     Console.WriteLine("");
     Console.WriteLine("Q) QUIT");
     return Input("Select option (1-5 / Q)");
