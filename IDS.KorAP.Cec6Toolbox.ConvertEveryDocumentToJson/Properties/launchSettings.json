@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "IDS.KorAP.Cec6Toolbox.ConvertEveryDocumentToJson": {
+      "commandName": "Project",
+      "commandLineArgs": "C:\\Users\\Jan\\Desktop\\Runde19\\cec6\\"
+    }
+  }
+}
