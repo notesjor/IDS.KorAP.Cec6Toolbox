@@ -20,11 +20,22 @@ namespace IDS.KorAP.Cec6Toolbox.ConvertEveryDocumentToJson
         foreach (var doc in docs)
         {
           var json = corpus.GetReadableDocument(doc, "Wort").ReduceDocumentToStreamDocument().ToArray();
-          var sigle = corpus.GetDocumentMetadata(doc)["Sigle"]?.ToString();
+          var name = GetFileName(corpus.GetDocumentMetadata(doc));
 
-          File.WriteAllText(Path.Combine(dir, $"{sigle.Replace("/", "_")}.json"), JsonConvert.SerializeObject(json));
+          File.WriteAllText(Path.Combine(dir, $"{name.Replace("/", "_")}.json"), JsonConvert.SerializeObject(json));
         }
       }
+    }
+
+    private static string GetFileName(Dictionary<string, object> dictionary)
+    {
+      if (dictionary.ContainsKey("Sigle"))
+        return dictionary["Sigle"]?.ToString();
+      if (dictionary.ContainsKey("Titel"))
+        return dictionary["Titel"]?.ToString();
+      if (dictionary.ContainsKey("GUID"))
+        return dictionary["GUID"]?.ToString();
+      return "---ERROR---";
     }
   }
 }
