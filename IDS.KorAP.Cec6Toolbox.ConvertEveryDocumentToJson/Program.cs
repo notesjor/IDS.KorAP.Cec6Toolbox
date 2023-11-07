@@ -32,7 +32,9 @@ namespace IDS.KorAP.Cec6Toolbox.ConvertEveryDocumentToJson
       if (dictionary.ContainsKey("Sigle"))
         return dictionary["Sigle"]?.ToString();
       if (dictionary.ContainsKey("Titel"))
-        return dictionary["Titel"]?.ToString();
+        return dictionary["Titel"]?.ToString();      
+      if (dictionary.ContainsKey("Firma") && dictionary.ContainsKey("Jahr"))
+        return $"{dictionary["Firma"]}_{dictionary["Jahr"]}";
       if (dictionary.ContainsKey("GUID"))
         return dictionary["GUID"]?.ToString();
       return "---ERROR---";
