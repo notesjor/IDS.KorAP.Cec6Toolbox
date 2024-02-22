@@ -23,27 +23,38 @@ namespace IDS.KorAP.Cec6Toolbox.CopySymbolicLinks
       var lines = Mode_File_Preprocess(filter);
       foreach (var x in lines)
       {
-        var file = Path.Combine(input, x.EndsWith(".cec6") ? x : x + ".cec6");
-        if(!File.Exists(file))
-          continue;
-        
-        var link = Path.Combine(output, Path.GetFileName(file));
-
-        Console.WriteLine($"{file} -> {link}");
-
-        var process = new Process
+        try
         {
-          StartInfo = new ProcessStartInfo
+          var file = Path.Combine(input, x.EndsWith(".cec6") ? x : x + ".cec6");
+          if (!File.Exists(file))
+            continue;
+
+          var link = Path.Combine(output, Path.GetFileName(file));
+          if(File.Exists(link))
+            continue;
+          if(Directory.Exists(link))
+            continue;
+
+          Console.WriteLine($"{file} -> {link}");
+
+          var process = new Process
           {
-            FileName = "ln",
-            Arguments = $"-s {file} {link}",
-            UseShellExecute = true,
-            CreateNoWindow = true,
-            WindowStyle = ProcessWindowStyle.Hidden
-          }
-        };
-        process.Start();
-        process.WaitForExit();
+            StartInfo = new ProcessStartInfo
+            {
+              FileName = "ln",
+              Arguments = $"-s {file} {link}",
+              UseShellExecute = true,
+              CreateNoWindow = true,
+              WindowStyle = ProcessWindowStyle.Hidden
+            }
+          };
+          process.Start();
+          process.WaitForExit();
+        }
+        catch (Exception ex)
+        {
+          Console.WriteLine(ex.Message);
+        }
       }
     }
 
@@ -74,21 +85,33 @@ namespace IDS.KorAP.Cec6Toolbox.CopySymbolicLinks
     {
       foreach (var file in Directory.GetFiles(input, filter, SearchOption.TopDirectoryOnly))
       {
-        var link = Path.Combine(output, Path.GetFileName(file));
-
-        var process = new Process
+        try
         {
-          StartInfo = new ProcessStartInfo
+          var link = Path.Combine(output, Path.GetFileName(file));
+
+          if (File.Exists(link))
+            continue;
+          if (Directory.Exists(link))
+            continue;
+
+          var process = new Process
           {
-            FileName = "ln",
-            Arguments = $"-s {file} {link}",
-            UseShellExecute = true,
-            CreateNoWindow = true,
-            WindowStyle = ProcessWindowStyle.Hidden
-          }
-        };
-        process.Start();
-        process.WaitForExit();
+            StartInfo = new ProcessStartInfo
+            {
+              FileName = "ln",
+              Arguments = $"-s {file} {link}",
+              UseShellExecute = true,
+              CreateNoWindow = true,
+              WindowStyle = ProcessWindowStyle.Hidden
+            }
+          };
+          process.Start();
+          process.WaitForExit();
+        }
+        catch (Exception ex)
+        {
+          Console.WriteLine(ex.Message);
+        }
       }
     }
   }
