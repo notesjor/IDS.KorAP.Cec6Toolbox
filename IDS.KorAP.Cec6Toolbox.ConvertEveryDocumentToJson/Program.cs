@@ -12,7 +12,7 @@ namespace IDS.KorAP.Cec6Toolbox.ConvertEveryDocumentToJson
       CorpusExplorerEcosystem.InitializeMinimal();
 
       var dir = args[0];
-      foreach (var file in Directory.GetFiles(dir, "*.cec6", SearchOption.TopDirectoryOnly))
+      foreach (var file in GetFiles(dir))
       {
         var corpus = CorpusAdapterWriteDirect.Create(file);
         var docs = corpus.DocumentGuids;
@@ -25,6 +25,15 @@ namespace IDS.KorAP.Cec6Toolbox.ConvertEveryDocumentToJson
           File.WriteAllText(Path.Combine(dir, $"{name.Replace("/", "_")}.json"), JsonConvert.SerializeObject(json));
         }
       }
+    }
+
+    private static IEnumerable<string> GetFiles(string dir)
+    {
+      var res = new List<string>();
+      res.AddRange(Directory.GetFiles(dir, "*.cec6", SearchOption.TopDirectoryOnly));
+      res.AddRange(Directory.GetFiles(dir, "*.cec6.gz", SearchOption.TopDirectoryOnly));
+      res.AddRange(Directory.GetFiles(dir, "*.cec6.lz4", SearchOption.TopDirectoryOnly));
+      return res;
     }
 
     private static string GetFileName(Dictionary<string, object> dictionary)
