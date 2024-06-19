@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "IDS.KorAP.Cec6Toolbox.DbIndex": {
+      "commandName": "Project",
+      "commandLineArgs": "\"C:\\Projekte\\IDS\\IDS.KorAP.Cec6Toolbox\\IDS.KorAP.Cec6Toolbox.DbIndex\\bin\\Release\\net6.0\\corpora\""
+    }
+  }
+}

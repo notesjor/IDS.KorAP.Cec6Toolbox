@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\CorpusExplorerV2\CorpusExplorer\BitCutStudios.CorpusExplorer\BitCutStudios.CorpusExplorer.csproj" />
+    <ProjectReference Include="..\..\..\CorpusExplorerV2\CorpusExplorer\CorpusExplorer.Sdk.Diagnostic\CorpusExplorer.Sdk.Diagnostic.csproj" />
+    <ProjectReference Include="..\..\..\CorpusExplorerV2\CorpusExplorer\CorpusExplorer.Sdk\CorpusExplorer.Sdk.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Devart.Data">
+      <HintPath>..\..\..\..\Program Files\Devart\dotConnect\SQLite\Devart.Data.dll</HintPath>
+    </Reference>
+    <Reference Include="Devart.Data.Linq">
+      <HintPath>..\..\..\..\Program Files\Devart\dotConnect\Linq\Devart.Data.Linq.dll</HintPath>
+    </Reference>
+    <Reference Include="Devart.Data.SQLite">
+      <HintPath>..\..\..\..\Program Files\Devart\dotConnect\SQLite\Devart.Data.SQLite.dll</HintPath>
+    </Reference>
+    <Reference Include="Devart.Data.SQLite.Linq">
+      <HintPath>..\..\..\..\Program Files\Devart\dotConnect\Linq\Devart.Data.SQLite.Linq.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="DerekoDataContext.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>DerekoDataContext.lqml</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="data.db3">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="DerekoDataContext.lqml">
+      <Generator>DevartLinqToSqlGenerator</Generator>
+      <LastGenOutput>DerekoDataContext.Designer.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Database Name="main" EntityNamespace="MainContext" ContextNamespace="MainContext" Class="MainDataContext" xmlns:ed="http://devart.com/schemas/EntityDeveloper/1.0" ed:Guid="29ed9c17-c729-41e4-a1f4-6be933f18651" Provider="Devart.Data.SQLite.Linq.Provider.SQLiteDataProvider, Devart.Data.SQLite.Linq" Extended="true" xmlns="http://schemas.devart.com/linqconnect/mapping">
+  <Connection Mode="ConnectionString" ConnectionString="Data Source=C:\Projekte\IDS\IDS.KorAP.Cec6Toolbox\IDS.KorAP.Cec6Toolbox.DbIndex\data.db3;FailIfMissing=False" Provider="Devart.Data.SQLite" />
+  <Table Name="&quot;main&quot;.Corpora" Member="Corpora">
+    <Type Name="Corpus" ed:Guid="239080e1-771f-4b75-beb5-f403eb967055">
+      <Column Name="Id" Type="System.Int64" AutoSync="OnInsert" DbType="integer NOT NULL" IsReadOnly="true" IsPrimaryKey="true" IsDbGenerated="true" CanBeNull="false" UpdateCheck="Always" ed:ValidateRequired="true" ed:Guid="60c1351e-da97-47f4-96ca-d2034b62352b" />
+      <Column Name="Name" Type="System.String" DbType="text NOT NULL" CanBeNull="false" UpdateCheck="Never" ed:ValidateRequired="true" ed:Guid="1e3e2b4e-e4e2-4cec-b4a3-fe429be5cb53" />
+      <Association Name="Corpus_Document" ed:AssociationGuid="3622dd29-8b7b-48d2-9c40-319e9e0cd825" Member="Documents" ed:Guid="006c8b40-9691-4945-a7de-214556f6dd80" ThisKey="Id" OtherKey="CorpusId" Type="Document" />
+    </Type>
+  </Table>
+  <Table Name="&quot;main&quot;.Documents" Member="Documents">
+    <Type Name="Document" ed:Guid="054cd595-a41c-4722-9f64-de497c133b11">
+      <Column Name="Id" Type="System.Guid" DbType="guid NOT NULL" IsPrimaryKey="true" CanBeNull="false" UpdateCheck="Always" ed:ValidateRequired="true" ed:Guid="91a63881-da61-40f1-9097-69bea2071e48" />
+      <Column Name="CorpusId" Type="System.Int64" DbType="integer NOT NULL" CanBeNull="false" UpdateCheck="Never" ed:ValidateRequired="true" ed:Guid="7506e691-f236-45d7-8d04-385ae861eebd" />
+      <Column Name="Year" Type="System.Int32" DbType="integer NOT NULL" CanBeNull="false" UpdateCheck="Never" ed:ValidateRequired="true" ed:Guid="8082d1bc-038b-4bad-8a3d-766d2163cabb" />
+      <Column Name="Month" Type="System.Int32" DbType="integer NOT NULL" CanBeNull="false" UpdateCheck="Never" ed:ValidateRequired="true" ed:Guid="87afab47-d18f-4625-8cdf-af0d5c1037b2" />
+      <Column Name="Day" Type="System.Int32" DbType="integer NOT NULL" CanBeNull="false" UpdateCheck="Never" ed:ValidateRequired="true" ed:Guid="f1e8a314-5489-4609-9bb6-204d61914ea4" />
+      <Association Name="Corpus_Document" ed:AssociationGuid="3622dd29-8b7b-48d2-9c40-319e9e0cd825" Member="Corpus" ed:Guid="1531f201-ed37-4fdb-85b1-85b2bad2c6d2" ThisKey="CorpusId" OtherKey="Id" Type="Corpus" DeleteRule="NO ACTION" IsForeignKey="true" />
+    </Type>
+  </Table>
+</Database>
