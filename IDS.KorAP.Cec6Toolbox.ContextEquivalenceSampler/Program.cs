@@ -1,21 +1,24 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using CorpusExplorer.Sdk.Blocks;
+﻿using CorpusExplorer.Sdk.Blocks;
 using CorpusExplorer.Sdk.Ecosystem;
 using CorpusExplorer.Sdk.Ecosystem.Model;
 using CorpusExplorer.Sdk.Model;
 using CorpusExplorer.Sdk.Model.Adapter.Corpus;
 using CorpusExplorer.Sdk.Model.Cache;
 using CorpusExplorer.Sdk.Model.Extension;
+using CorpusExplorer.Sdk.Utils.CorpusManipulation;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
 
 namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
 {
   class Program
   {
     private static Random _rnd = new Random();
+    private static CorpusAdapterWriteDirect _corpus;
+    private static Selection _all;
 
     static void Main(string[] args)
     {
@@ -26,52 +29,42 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
       }
 
       var layer = args[0]; // Layer (alle Korpora müssen diesen Layer beinahlten)
-      var query = args[1]; // Token für das die Kontext-Äquivalenz hergestellt werden soll
-      var min = double.Parse(args[2]); // Minimale Anpassung (wenn unterschritten > Abbruch)
-      var max = int.Parse(args[3]); // Maximale Anzahl an Runden (wenn überschritten > Abbruch)
-      var log = args[4]; // Ausgabedatei
+      var min = double.Parse(args[1]); // Minimale Anpassung (wenn unterschritten > Abbruch)
+      var max = int.Parse(args[2]); // Maximale Anzahl an Runden (wenn überschritten > Abbruch)
+      var log = args[3]; // Ausgabedatei
 
       // Initialisiere den CorpusExplorer
-      var project = CorpusExplorerEcosystem.InitializeMinimal(new CacheStrategyDisableCaching());
+      CorpusExplorerEcosystem.InitializeMinimal(new CacheStrategyDisableCaching());
       Configuration.MinimumFrequency = 10;
       Configuration.MinimumSignificance = 1.0;
 
-      var files = new List<string>(args);
-      files.RemoveRange(0, 5); // zwei oder mehr Korpora
+      var files = new List<string>(args.Skip(4));
 
-      PrintInfo(files, layer, query, min, max, log);
+      PrintInfo(files, layer, min, max, log);
 
-      var corpora = files.Select(x => CorpusAdapterWriteDirect.Create(x)).ToArray();
-      foreach (var c in corpora)
-        project.Add(c);
+      // Preparation
+      var selections = PrepareCorpusIndex(files, layer);
+
+      var corporaCount = selections.Count();
+      var sizes = selections.Select(x => x.Sum(y => (long)y.Value)).ToArray();
+      // Berechne das Kookkurrenzfeld für die Basis-Korpora
+      var baseField = selections.Select(x => GetBaseCooccurrences(layer, x.Keys)).ToArray();
+      var targets = baseField.Select(x => x.Sum(x => x.Value.Length)).ToArray();
 
       // Ratios - in der ersten Runde immer 1.0
       // Danach werden die Ratios angepasst.
-      var ratios = new double[files.Count];
+      var ratios = new double[corporaCount];
       for (var i = 0; i < ratios.Length; i++)
         ratios[i] = 1.0;
-      
-      var success = false;
-      Selection all = null;
-      var samples = new Selection[corpora.Length];
 
+      List<Guid> last = null;
       for (var i = 1; i <= max; i++)
       {
-        for (var j = 0; j < corpora.Length; j++)
-          // Zufällige Auswahl an Texten im Verhältnis Korpusgröße (in Token) * Ratio (z. B. 0.75)
-          samples[j] = SampleCorpus(corpora[j], ratios[j]);
-        
-        // Berechne einmalig für ein Korpus die Kookkurrenzen zum Suchwort
-        var parts = GetCorpusCooccurrences(samples, layer, query);
-        var targets = parts.Select(x => x.Count).ToArray();
-
-        // Mische alle zufällig ausgewählten Texte zusammen
-        all = project.SelectAll.CreateTemporary(MergeSelections(samples));
-
-        // Berechne, die Kookkurrenzen zum Suchwort im sample
-        var cooccurrences = GetMergedSampelCooccurrences(all, layer, query);
+        last = SampleCorpus(ref ratios, ref sizes, ref selections);
+        // Berechne, die Kookkurrenzen für das Sample
+        var cooccurrences = GetCooccurrences(layer, last);
         // Zähle, pro Korpus wieviele Kookkurrenzen mit den Gesamt-Kookkurrenzen übereinstimmen
-        var matches = GetMatches(cooccurrences, parts);
+        var matches = GetMatches(cooccurrences, baseField);
         // Berechne eine neue Ratio
         var ratiosNew = Resolve(matches, targets, min, ratios);
 
@@ -81,29 +74,104 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
         // Abbruch, wenn ein Korpus überhaupt nicht mehr gebraucht wird.
         if (CalcChangeDiff(ratios, ratiosNew) < min || ratiosNew.Any(x => x == 0) || ratiosNew.All(x => (int)x == 1))
         {
-          success = true;
-          Save(query, log, all, samples);
-          break;
+          Save(last);
+          return; // Beende Programm
         }
 
         ratios = ratiosNew;
       }
 
-      if(!success)
-        Save(query, log, all, samples);
+      Save(last);
     }
 
-    private static void Save(string query, string log, Selection all, Selection[] samples)
+    private static List<Guid> SampleCorpus(ref double[] ratios, ref long[] sizes, ref List<Dictionary<Guid, int>> corpora)
     {
-      all.ToCorpus().Save($"{log.Replace(".log", "")}_{query}.cec6.lz4");
-      foreach (var x in samples)
-        x.ToCorpus().Save($"{log.Replace(".log", "")}_{x.Displayname}.cec6.lz4");
+      var res = new List<Guid>();
+
+      for (int i = 0; i < corpora.Count; i++)
+      {
+        var ratio = ratios[i];
+
+        if (ratio >= 1.0)
+        {
+          res.AddRange(corpora[i].Keys);
+          continue;
+        }
+
+        var c = corpora[i];
+        long size = (long)(sizes[i] / ratio);
+        if (size < 1000)
+          size = 1000;
+        long cnt = 0;
+
+        var input = c.Keys.ToList();
+        var output = new List<Guid>();
+
+        while (cnt < size && input.Count > 0)
+        {
+          var rnds = GetRandomIndices(input.Count, 1000);
+          var breaks = false;
+
+          foreach (var id in rnds)
+          {
+            var guid = input[id];
+            output.Add(guid);
+            input.RemoveAt(id);
+
+            cnt += c[guid];
+            if (cnt > size)
+            {
+              breaks = true;
+              break;
+            }
+          }
+          if (breaks)
+            break;
+        }
+
+        res.AddRange(output);
+      }
+
+      return res;
     }
 
-    private static void PrintInfo(List<string> files, string layer, string query, double min, int max, string log)
+    private static List<Dictionary<Guid, int>> PrepareCorpusIndex(List<string> files, string layer)
+    {
+      var res = new List<Dictionary<Guid, int>>();
+
+      var merger = new CorpusMerger();
+      foreach (var file in files)
+      {
+        var corpus = CorpusAdapterWriteDirect.Create(file);
+        foreach (var l in corpus.LayerUniqueDisplaynames.Where(x => x != layer))
+          corpus.LayerDelete(l);
+        merger.Input(corpus);
+
+        var sLayer = corpus.GetLayers(layer).First();
+        res.Add(sLayer.DocumentGuids.AsParallel().ToDictionary(x => x, x => sLayer[x].Sum(y => y.Length)));
+
+        corpus.Dispose();
+      }
+
+      merger.Execute();
+
+      merger.Output.TryDequeue(out var c);
+      _corpus = (CorpusAdapterWriteDirect)c;
+      _all = _corpus.ToSelection();
+
+      return res;
+    }
+
+    private static void Save(List<Guid> selection)
+    {
+      if (selection != null)
+        _all.CreateTemporary(selection).ToCorpus().Save("output.cec6", false);
+    }
+
+    private static void PrintInfo(List<string> files, string layer, double min, int max, string log)
     {
       Console.WriteLine("ContextEquivalenceSampler - (c) 2022 by Jan Oliver Rüdiger");
-      Console.WriteLine($"{files.Count} files - Layer: {layer} - Query: {query}");
+      Console.WriteLine($"{files.Count} files - Layer: {layer}");
       Console.WriteLine($"min. change: {min} - max. rounds: {max}");
       Console.WriteLine($"output: {log}");
     }
@@ -174,87 +242,41 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
       return factor;
     }
 
-    private static int[] GetMatches(string[] cooccurrences, HashSet<string>[] parts)
+    private static int[] GetMatches(Dictionary<int, HashSet<int>> cooccurrences, Dictionary<int, int[]>[] baseField)
     {
-      var res = new int[parts.Length];
-      for (var i = 0; i < parts.Length; i++)
-        res[i] = cooccurrences.Count(x => parts[i].Contains(x));
-      return res;
-    }
-
-    private static string[] GetMergedSampelCooccurrences(Selection all, string layer, string query) =>
-      GetCooccurrences(layer, query, all).Select(x => x.Key)
-                                         .ToArray();
-
-    private static IEnumerable<Guid> MergeSelections(Selection[] selections)
-    {
-      var res = new List<Guid>();
-      foreach (var s in selections)
-        res.AddRange(s.DocumentGuids);
-      return res;
-    }
-
-    private static HashSet<string>[] GetCorpusCooccurrences(Selection[] selections, string layer, string query)
-    {
-      var res = new HashSet<string>[selections.Length];
-      for (var i = 0; i < selections.Length; i++)
-        res[i] = new HashSet<string>(GetCooccurrences(layer, query, selections[i]).Keys);
-
-      return res;
-    }
-
-    private static Dictionary<string, double> GetCooccurrences(string layer, string query, Selection s)
-    {
-      var block = s.CreateBlock<CooccurrenceSelectiveBlock>();
-      block.LayerDisplayname = layer;
-      block.LayerQueries = new[] { query };
-      block.Calculate();
-
-      return block.CooccurrenceSignificance;
-    }
-
-    private static Selection SampleCorpus(CorpusAdapterWriteDirect cec6, double ratio)
-    {
-      if (ratio >= 1.0)
-        return cec6.ToSelection();
-
-      var input = cec6.DocumentGuids.ToList();
-      var output = new List<Guid>();
-
-      var size = cec6.CountToken * ratio;
-      long cnt = 0;
-
-      while (cnt < size && input.Count > 0)
+      var res = new int[baseField.Length];
+      for (var i = 0; i < baseField.Length; i++)
       {
-        var rnds = GetRandomIndices(input.Count, 1000);
-        var breaks = false;
-
-        foreach (var id in rnds)
-        {
-          var guid = input[id];
-          output.Add(guid);
-          input.RemoveAt(id);
-
-          cnt += cec6.GetDocumentLengthInWords(guid);
-          if (cnt > size)
-          {
-            breaks = true;
-            break;
-          }
-        }
-        if (breaks)
-          break;
+        var count = 0;
+        foreach (var x in baseField[i])
+          if (cooccurrences.ContainsKey(x.Key))
+            count += x.Value.Count(y => cooccurrences[x.Key].Contains(y));
+        res[i] = count;
       }
-
-      var res = cec6.ToSelection().CreateTemporary(output);
-      res.Displayname = cec6.CorpusDisplayname;
-
       return res;
+    }
+
+    private static Dictionary<int, int[]> GetBaseCooccurrences(string layer, IEnumerable<Guid> selections)
+    {
+      var select = _all.CreateTemporary(selections);
+      var block = select.CreateBlock<CooccurrenceIndexOnlyBlock>();
+      block.LayerDisplayname = layer;
+      block.Calculate();
+      return block.CooccurrenceSignificance.ToDictionary(x => x.Key, x => x.Value.Keys.ToArray());
+    }
+
+    private static Dictionary<int, HashSet<int>> GetCooccurrences(string layer, IEnumerable<Guid> selections)
+    {
+      var select = _all.CreateTemporary(selections);
+      var block = select.CreateBlock<CooccurrenceIndexOnlyBlock>();
+      block.LayerDisplayname = layer;
+      block.Calculate();
+      return block.CooccurrenceSignificance.ToDictionary(x => x.Key, x => new HashSet<int>(x.Value.Keys));
     }
 
     private static void PrintHelp()
     {
-      Console.WriteLine("./ces \"Lemma (tree_tagger)\" \"Haus\" 0.1 10 output.log corpus1.cec6 corpus2.cec6 corpus3.cec6");
+      Console.WriteLine("./ces \"Lemma (tree_tagger)\" 0.1 10 output.log corpus1.cec6 corpus2.cec6 corpus3.cec6");
     }
 
     private static int[] GetRandomIndices(int count, int max)
