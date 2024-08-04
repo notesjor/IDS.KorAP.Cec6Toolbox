@@ -60,14 +60,14 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
       for (var i = 0; i < ratios.Length; i++)
         ratios[i] = 1.0;
 
-      List<Guid> last = null;
+      List<Guid> guids = null;
       for (var i = 1; i <= max; i++)
       {
         PrintRatios(ratios);
 
-        last = SampleCorpus(ratios, ref sizes, ref selections);
+        guids = SampleCorpus(ratios, ref sizes, ref selections);
         // Berechne, die Kookkurrenzen für das Sample
-        var cooccurrences = GetCooccurrences(layer, last);
+        var cooccurrences = GetCooccurrences(layer, guids);
         // Zähle, pro Korpus wieviele Kookkurrenzen mit den Gesamt-Kookkurrenzen übereinstimmen
         var matches = GetMatches(cooccurrences, baseField);
         PrintMatches(matches);
@@ -83,14 +83,14 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
         Console.WriteLine($"CR: {change}");
         if (change < minChange || ratiosNew.Any(x => x == 0) || ratiosNew.All(x => (int)x == 1))
         {
-          Save(last);
+          Save(guids);
           return; // Beende Programm
         }
 
         ratios = ratiosNew;
       }
 
-      Save(last);
+      Save(guids);
     }
 
     private static void PrintBaseField(Dictionary<int, int[]>[] baseField)
