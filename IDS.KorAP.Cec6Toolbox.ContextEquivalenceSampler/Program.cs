@@ -124,7 +124,7 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
         }
 
         var c = corpora[i];
-        long size = (long)(sizes[i] / ratio);
+        long size = (long)(sizes[i] * ratio);
         if (size < 1000)
           size = 1000;
         long cnt = 0;
