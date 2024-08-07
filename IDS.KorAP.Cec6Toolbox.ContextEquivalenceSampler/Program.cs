@@ -3,6 +3,7 @@ using CorpusExplorer.Sdk.Ecosystem;
 using CorpusExplorer.Sdk.Ecosystem.Model;
 using CorpusExplorer.Sdk.Model;
 using CorpusExplorer.Sdk.Model.Adapter.Corpus;
+using CorpusExplorer.Sdk.Model.Adapter.Layer;
 using CorpusExplorer.Sdk.Model.Cache;
 using CorpusExplorer.Sdk.Model.Extension;
 using CorpusExplorer.Sdk.Utils.CorpusManipulation;
@@ -34,6 +35,9 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
       var minChange = double.Parse(args[3]); // Minimale Anpassung (wenn unterschritten > Abbruch)
       var max = int.Parse(args[4]); // Maximale Anzahl an Runden (wenn überschritten > Abbruch)
       var log = args[5]; // Ausgabedatei
+
+      if (File.Exists(log))
+        File.Delete(log);
 
       // Initialisiere den CorpusExplorer
       CorpusExplorerEcosystem.InitializeMinimal(new CacheStrategyDisableCaching());
@@ -172,10 +176,10 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
         var corpus = CorpusAdapterWriteDirect.Create(file);
         foreach (var l in corpus.LayerUniqueDisplaynames.Where(x => x != layer))
           corpus.LayerDelete(l);
-        merger.Input(corpus);
 
-        var sLayer = corpus.GetLayers(layer).First();
-        res.Add(sLayer.DocumentGuids.AsParallel().ToDictionary(x => x, x => sLayer[x].Sum(y => y.Length)));
+        corpus = ConvertSentenceToDocuments(corpus, layer, out var sizeInfo);
+        res.Add(sizeInfo);
+        merger.Input(corpus);        
 
         corpus.Dispose();
       }
@@ -187,6 +191,53 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
       _all = _corpus.ToSelection();
 
       return res;
+    }
+
+    private static CorpusAdapterWriteDirect ConvertSentenceToDocuments(CorpusAdapterWriteDirect corpus, string layer, out Dictionary<Guid, int> sizeInfo)
+    {
+      var l = corpus.GetLayers(layer).First();
+      var state = l.ToLayerState();
+
+      var dictGuids = new Dictionary<Guid, Guid>();
+      var newDocs = new Dictionary<Guid, int[][]>();
+      sizeInfo = new Dictionary<Guid, int>();
+
+      foreach (var dsel in state._documents)
+      {
+        var oguid = dsel.Key;
+        foreach (var s in dsel.Value)
+        {
+          var size = s.Length;
+          if (size < 4)
+            continue;
+          if(size > 100)
+            continue;
+
+          var nguid = Guid.NewGuid();
+          sizeInfo.Add(nguid, size);
+          dictGuids.Add(nguid, oguid);
+          newDocs.Add(nguid, new int[][] { s });
+        }
+      }
+
+      state._documents = newDocs;
+      corpus.LayerDelete(layer);
+      corpus.AddLayer(LayerAdapterWriteDirect.Create(state));
+
+      var ometa = corpus.DocumentMetadata.ToDictionary(x => x.Key, x => x.Value);
+      var nmeta = new Dictionary<Guid, Dictionary<string, object>>();
+      foreach (var g in dictGuids)
+      {
+        var meta = ometa[g.Value].ToDictionary(x => x.Key, x => x.Value);
+        if (meta.ContainsKey("GUID"))
+          meta.Remove("GUID");
+        if (meta.ContainsKey("RGUID"))
+          meta.Remove("RGUID");
+        meta.Add("RGUID", g.Value);
+        nmeta.Add(g.Key, meta);
+      }
+      corpus.ResetAllDocumentMetadata(nmeta);
+      return corpus;
     }
 
     private static void Save(List<Guid> selection)
@@ -334,7 +385,7 @@ namespace IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler
         tmp.Add(i);
 
       var res = new int[max];
-      for(var i = 0; i < res.Length; i++)
+      for (var i = 0; i < res.Length; i++)
       {
         var idx = _rnd.Next(0, tmp.Count);
         res[i] = tmp[idx];

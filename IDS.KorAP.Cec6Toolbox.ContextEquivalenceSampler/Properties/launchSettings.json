@@ -2,7 +2,7 @@
   "profiles": {
     "IDS.KorAP.Cec6Toolbox.ContextEquivalenceSampler": {
       "commandName": "Project",
-      "commandLineArgs": "Wort 0.1 10 log.txt s15.cec6 z21.cec6"
+      "commandLineArgs": "5 0.9 Wort 0.1 10 log.txt s15.cec6 z21.cec6"
     }
   }
 }
