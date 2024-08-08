@@ -9,7 +9,7 @@ namespace IDS.KorAP.Cec6Toolbox.MakeIndex
     private static string _basePath = "/vol/corpora/DeReKo/current/KorAP/zip";
     private static string _cec6Path = "/home/ruediger/CEC6";
     private static string _tempPath = "/home/ruediger/CEC6-TMP";
-    private static string[] _corpusFilter = new[] { "wdd", "wpd", "wrd", "wud", "twi" };
+    private static string[] _corpusFilter = new[] { "wdd", "wpd", "wrd", "wud", "twi", "ndy" };
 
     private static string[] _foundries =
     {
@@ -179,18 +179,23 @@ namespace IDS.KorAP.Cec6Toolbox.MakeIndex
     private static List<string> ListMissingTreeTagger()
     {
       var files = Directory.GetFiles(_basePath, "*.zip").Select(x => Path.GetFileName(x));
+      var cec6 = new HashSet<string>(Directory.GetFiles(_cec6Path, "*.cec6").Select(x => Path.GetFileNameWithoutExtension(x)));
       var tt = new HashSet<string>();
       var zf = new HashSet<string>();
 
       foreach (var file in files)
       {
         var split = file.Split(".", StringSplitOptions.RemoveEmptyEntries);
-        if ((split.Length > 2) && (split[1] == "tree_tagger"))
-          tt.Add(split[0]);
+
+        if (cec6.Contains(split[0]))
+          continue;
 
         foreach (var f in _corpusFilter)
           if (split[0].StartsWith(f))
             continue;
+
+        if ((split.Length > 2) && (split[1] == "tree_tagger"))
+          tt.Add(split[0]);
 
         if (split.Length == 2)
           zf.Add(split[0]);
