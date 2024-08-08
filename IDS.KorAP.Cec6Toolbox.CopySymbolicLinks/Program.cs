@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace IDS.KorAP.Cec6Toolbox.CopySymbolicLinks
 {
@@ -15,6 +16,9 @@ namespace IDS.KorAP.Cec6Toolbox.CopySymbolicLinks
         case "q":
           Mode_Direct(args);
           return;
+        case "sigle":
+          Mode_Sigle(args);
+          return;
         case "file":
           Mode_File(args);
           return;
@@ -27,16 +31,45 @@ namespace IDS.KorAP.Cec6Toolbox.CopySymbolicLinks
       }
     }
 
+    private static void Mode_Sigle(string[] args)
+    {
+      var input = args[0];
+      var sigle = args[1];
+      var output = args[2];
+      Directory.SetCurrentDirectory(output);
+
+      if (!Directory.Exists(output))
+        Directory.CreateDirectory(output);
+
+
+      var process = new Process
+      {
+        StartInfo = new ProcessStartInfo
+        {
+          FileName = "find",
+          Arguments = $"{input} -regextype posix-extended -regex '.*{sigle}[0-9]{{2}}\\.cec6' -exec ln -s {{}} \\;",
+          UseShellExecute = true,
+          CreateNoWindow = true,
+          WindowStyle = ProcessWindowStyle.Hidden,
+          WorkingDirectory = output
+        }
+      };
+      process.Start();
+      process.WaitForExit();
+    }
+
     private static void PrintHelp()
     {
-      Console.WriteLine("Mode: q / file / data");
+      Console.WriteLine("Mode: q / file / data / sigle");
       Console.WriteLine("q: Direct copy");
       Console.WriteLine("file: Copy files based on a list");
       Console.WriteLine("date: Copy files based on a date range");
+      Console.WriteLine("sigle: Copy files based on a sigle");
 
       Console.WriteLine("q: input filter output");
       Console.WriteLine("file: input file output");
       Console.WriteLine("date: input start end output");
+      Console.WriteLine("sigle: input sigle output");
     }
 
     private static void Mode_Date(string[] args)
@@ -47,7 +80,7 @@ namespace IDS.KorAP.Cec6Toolbox.CopySymbolicLinks
       var output = args[3];
       Directory.SetCurrentDirectory(output);
 
-      if(!Directory.Exists(output))
+      if (!Directory.Exists(output))
         Directory.CreateDirectory(output);
 
       var files = new HashSet<string>(Directory.GetFiles(input).Select(x => Path.GetFileNameWithoutExtension(x)));
@@ -62,7 +95,7 @@ namespace IDS.KorAP.Cec6Toolbox.CopySymbolicLinks
         if (File.Exists(link))
           continue;
         if (Directory.Exists(link))
-            continue;
+          continue;
 
         var process = new Process
         {
