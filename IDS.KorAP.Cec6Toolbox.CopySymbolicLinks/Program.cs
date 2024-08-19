@@ -25,9 +25,69 @@ namespace IDS.KorAP.Cec6Toolbox.CopySymbolicLinks
         case "date":
           Mode_Date(args);
           return;
+        case "regex":
+          Mode_Regex(args);
+          return;
+        case "compare":
+          Mode_Compare(args);
+          return;
         default:
           PrintHelp();
           return;
+      }
+    }
+
+    private static void Mode_Regex(string[] args)
+    {
+      var input = args[0];
+      var sigle = new Regex(args[1]);
+      var output = args[2];
+
+      var files = Directory.GetFiles(input, "*.*", SearchOption.TopDirectoryOnly);
+      foreach (var f in files)
+      {
+        var name = Path.GetFileName(f);
+
+        if (!sigle.IsMatch(name))
+          continue;
+
+        var link = Path.Combine(output, name);
+        if (File.Exists(link))
+          continue;
+        if (Directory.Exists(link))
+          continue;
+
+        var process = new Process
+        {
+          StartInfo = new ProcessStartInfo
+          {
+            FileName = "ln",
+            Arguments = $"-s {f} {link}",
+            UseShellExecute = true,
+            CreateNoWindow = true,
+            WindowStyle = ProcessWindowStyle.Hidden
+          }
+        };
+        process.Start();
+        process.WaitForExit();
+      }
+    }
+
+    private static void Mode_Compare(string[] args)
+    {
+      var input = args[0];
+      var output = args[1];
+
+      var filesIn = Directory.GetFiles(input, "*.*", SearchOption.TopDirectoryOnly);
+      var filesOut = new HashSet<string>(Directory.GetFiles(output, "*.*", SearchOption.TopDirectoryOnly).Select(x => Path.GetFileNameWithoutExtension(x)));
+
+      foreach (var f in filesIn)
+      {
+        var name = Path.GetFileNameWithoutExtension(f);
+        if (filesOut.Contains(name))
+          continue;
+
+        Console.WriteLine(f);
       }
     }
 
@@ -65,11 +125,15 @@ namespace IDS.KorAP.Cec6Toolbox.CopySymbolicLinks
       Console.WriteLine("file: Copy files based on a list");
       Console.WriteLine("date: Copy files based on a date range");
       Console.WriteLine("sigle: Copy files based on a sigle");
+      Console.WriteLine("regex: Copy files based on a regex");
+      Console.WriteLine("compare: Compare files in two directories");
 
       Console.WriteLine("q: input filter output");
       Console.WriteLine("file: input file output");
       Console.WriteLine("date: input start end output");
       Console.WriteLine("sigle: input sigle output");
+      Console.WriteLine("regex: input regex output");
+      Console.WriteLine("compare: input output");
     }
 
     private static void Mode_Date(string[] args)
