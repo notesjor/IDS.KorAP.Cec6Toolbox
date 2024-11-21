@@ -12,9 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Reference Include="CorpusExplorer.Sdk">
-      <HintPath>..\..\..\..\Users\Jan\AppData\Roaming\CorpusExplorer\App\CorpusExplorer.Sdk.dll</HintPath>
-    </Reference>
+    <ProjectReference Include="..\..\..\CorpusExplorerV2\CorpusExplorer\CorpusExplorer.Sdk\CorpusExplorer.Sdk.csproj" />
   </ItemGroup>
 
 </Project>
