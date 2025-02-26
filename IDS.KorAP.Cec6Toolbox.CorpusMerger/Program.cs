@@ -16,15 +16,56 @@ namespace IDS.KorAP.Cec6Toolbox.CorpusMerger
         Console.WriteLine(ex.StackTrace);
       };
 
-      if (args.Length != 2)
+      if (args.Length != 3)
       {
-        Console.WriteLine("Usage: ./IDS.KorAP.Cec6Toolbox.CorpusMerger <input> <output>");
+        Console.WriteLine("Usage: ./IDS.KorAP.Cec6Toolbox.CorpusMerger <mode:FILE/DIR> <input> <output>");
         return;
       }
 
-      var input = args[0];
-      var output = args[1];
+      var mode = args[0];
+      var input = args[1];
+      var output = args[2];
 
+      if (mode == "FILE")
+      {
+        MergeFiles(input, output);
+      }
+      else if (mode == "DIR")
+      {
+        ProcessSubDirs(input, output);
+      }
+      else
+      {
+        Console.WriteLine("Invalid mode: " + mode);
+      }
+    }
+
+    private static void MergeFiles(string input, string output)
+    {
+      var merger = new CorpusExplorer.Sdk.Utils.CorpusManipulation.CorpusMerger();
+      var mergeLock = new object();
+
+      Parallel.ForEach(Directory.GetFiles(input, "*.cec6", SearchOption.TopDirectoryOnly),
+        new ParallelOptions { MaxDegreeOfParallelism = 10 }, file =>
+      {
+        try
+        {
+          var corpus = CorpusAdapterWriteDirect.Create(file);
+          lock (mergeLock)
+            merger.Input(corpus);
+        }
+        catch
+        {
+          Console.WriteLine($"> file: {file}");
+        }
+      });
+
+      merger.Execute();
+      merger.Output.FirstOrDefault()?.Save(output, false);
+    }
+
+    private static void ProcessSubDirs(string input, string output)
+    {
       if (!Directory.Exists(output))
         Directory.CreateDirectory(output);
 
