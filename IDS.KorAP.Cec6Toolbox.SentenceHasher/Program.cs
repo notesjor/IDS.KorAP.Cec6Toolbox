@@ -3,6 +3,8 @@ using CorpusExplorer.Sdk.Model.Adapter.Corpus;
 using System.Runtime.Intrinsics.Arm;
 using System.Security.Cryptography;
 using Newtonsoft.Json;
+using CorpusExplorer.Sdk.Utils.CorpusManipulation;
+using CorpusExplorer.Sdk.Model.Extension;
 
 namespace IDS.KorAP.Cec6Toolbox.SentenceHasher
 {
@@ -23,8 +25,10 @@ namespace IDS.KorAP.Cec6Toolbox.SentenceHasher
 
       var lod = new object();
       var dic = new Dictionary<string, List<Item>>();
+      var don = 0;
+      var fil = Directory.GetFiles(dir, "*.cec6");
 
-      Parallel.ForEach(Directory.GetFiles(dir, "*.cec6"), new ParallelOptions { MaxDegreeOfParallelism = 20 }, file =>
+      Parallel.ForEach(fil, new ParallelOptions { MaxDegreeOfParallelism = 20 }, file =>
       {
         var fn = Path.GetFileName(file);
         var corpus = CorpusAdapterWriteIndirect.Create(file);
@@ -59,11 +63,43 @@ namespace IDS.KorAP.Cec6Toolbox.SentenceHasher
           }
         });
 
+        lock(lod)
+        {
+          don++;
+          Console.WriteLine($"{don}/{fil.Length}");
+        }
+
         sha.Dispose();
       });
 
       dic = dic.OrderByDescending(x => x.Value.Count).Take(1000).ToDictionary(x => x.Key, x => x.Value);
-      File.WriteAllText("result.json", JsonConvert.SerializeObject(dic));
+      //File.WriteAllText("result.json", JsonConvert.SerializeObject(dic));
+
+      var output = "result";
+      if(!Directory.Exists(output))
+        Directory.CreateDirectory(output);
+
+      foreach (var x in dic)
+      {
+        var fn = Path.Combine(output, x.Key.Replace("/", "_") + ".cec6");
+        var files = x.Value.Select(y => y.File).Distinct().ToArray();
+        var merger = new CorpusMerger();
+
+        CorpusAdapterWriteDirect corpus;
+        foreach (var file in files)
+        {
+          corpus = CorpusAdapterWriteDirect.Create(Path.Combine(dir, file));
+          var dsel = x.Value.Where(y => y.File == file).Select(y => y.Guid).ToArray();
+          var select = corpus.ToSelection(dsel);
+
+          merger.Input(select.ToCorpus());          
+        }
+        
+        merger.Execute();
+        corpus = (CorpusAdapterWriteDirect)merger.Output.First();
+
+        corpus.Save(fn);
+      }
     }
   }
 }
