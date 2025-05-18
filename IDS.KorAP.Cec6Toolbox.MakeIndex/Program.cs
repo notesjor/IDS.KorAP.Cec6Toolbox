@@ -26,6 +26,12 @@ namespace IDS.KorAP.Cec6Toolbox.MakeIndex
 
     static void Main(string[] args)
     {
+      if (args.Length == 0)
+      {
+        PrintHelp();
+        return;
+      }
+
       try
       {
         var command = args[0];
