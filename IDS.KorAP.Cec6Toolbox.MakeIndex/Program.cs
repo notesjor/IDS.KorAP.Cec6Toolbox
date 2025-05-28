@@ -81,8 +81,8 @@ namespace IDS.KorAP.Cec6Toolbox.MakeIndex
 
           var process = Process.Start(new ProcessStartInfo
           {
-            FileName = "dotnet",
-            Arguments = $"/home/ruediger/CorpusExplorer/cec.dll import#Korap2021#{_tempPath}/{fn}.zip convert Cec6#{outputFile}",
+            FileName = "/export/netapp/cec/dotnet/dotnet",
+            Arguments = $"/export/netapp/cec/CorpusExplorer/cec.dll import#Korap2021#{_tempPath}/{fn}.zip convert Cec6#{outputFile}",
             UseShellExecute = true,
             CreateNoWindow = true,
             WindowStyle = ProcessWindowStyle.Hidden
